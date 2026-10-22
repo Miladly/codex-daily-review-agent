@@ -21,8 +21,8 @@
 支持 **macOS、Linux，Python 3.10+**；Windows 用户请使用 WSL2，暂不支持原生 Windows。核心运行和测试仅使用标准库；SSH、Git、Codex CLI 按需要提供。无需 API Key、Notion 账户或 Codex CLI 即可生成规则摘要，前提是已有 Codex 会话日志。
 
 ```sh
-git clone https://github.com/Miladly/daily-review-agent.git
-cd daily-review-agent
+git clone https://github.com/Miladly/codex-daily-review-agent.git
+cd codex-daily-review-agent
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
