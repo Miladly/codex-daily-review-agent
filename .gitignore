@@ -1,0 +1,22 @@
+# Runtime and personal material: never publish.
+var/
+data/
+config.local.json
+notion-projects.json
+.env*
+*.sqlite*
+*.db
+*.jsonl
+*.log
+*.key
+*.pem
+.notion_token
+# Development and packaging
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.DS_Store

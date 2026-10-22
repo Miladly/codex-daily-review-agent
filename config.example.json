@@ -1,0 +1,13 @@
+{
+  "timezone": "Asia/Shanghai",
+  "exclude_session_ids": [],
+  "exclude_cwds": [],
+  "project_overrides": [],
+  "remote_sources": [],
+  "notion": {
+    "records_data_source": "",
+    "projects_data_source": "",
+    "project_aliases": {},
+    "create_missing_projects": false
+  }
+}
