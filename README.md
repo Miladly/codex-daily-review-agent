@@ -16,6 +16,7 @@
 - 提供先预览、后校验复制的笔记迁移；保护同名个人笔记、人工反思与原文件。
 - 区分 A（可观察工具记录）、B（会话陈述）、C（意图/计划）；退出码 0 不等于科研结论已验证。
 - 可选只读 SSH 采集：服务器内存解析，仅回传脱敏事件和游标；不安装远程文件或服务。
+- 内置参考 gstack `/retro` 的复盘方法：全天成果选材、关键决定、近三天延续线索；可选模型提炼要求可核验的下一步完成标准。
 - 可选 Codex 非交互式结构化总结，以及经过具体草稿审批的 Notion 同步。
 
 ## 快速开始
@@ -95,7 +96,7 @@ python3 -m unittest discover -s tests -v
 
 **SSH**：在本地私有配置的 `remote_sources` 中添加 SSH 别名。预先自行确认主机密钥和非交互认证，绝不关闭主机密钥校验。macOS 可复用 Keychain。配置和权限见 [配置说明](docs/configuration.md)。
 
-**模型总结**：`model-preview` 先导出将要发送的有限脱敏片段；审阅后可用 `review --backend codex`。这会把片段发送给你所配置的模型提供方，`daily` 默认不会调用模型。模型工具活动、无效证据引用和证据升级会被拒绝。
+**模型总结**：`model-preview` 先导出将要发送的有限脱敏片段；审阅后可用 `review --backend codex`。这会把片段发送给你所配置的模型提供方，`daily` 默认不会调用模型。模型工具活动、无效证据引用和证据升级会被拒绝。模型会明确加载内置 skill 与质量量表，按目标、进展、决定、阻塞、下一步和跨天延续提炼；历史线索不会自动算作当日完成。规则后端按全天信号选材，仍是保守摘录。来源、许可证、适配范围和验证边界见 [复盘方法依据](docs/review-method-sources.md)。
 
 **Notion**：复用你已有的工作记录和项目库，配置自己的 data source ID。令牌只从 `NOTION_TOKEN` 或 macOS Keychain 服务 `DailyReviewAgent.Notion` 读取。先生成 `notion-plan --online`，检查内容后用 `notion-sync --plan ... --approve ...` 执行。只更新 Agent 管理块；人工改动、已确认记录、重复日期/类型行等会阻止写入。不会自动修改 schema 或创建任务/知识；缺失项目补建需要显式配置和同次审批。
 
@@ -113,4 +114,4 @@ python3 tools/check_release.py
 
 ## License
 
-MIT，见 [LICENSE](LICENSE)。示例为合成内容，不包含真实用户会话。贡献与反馈见 [CONTRIBUTING.md](CONTRIBUTING.md)，漏洞处理见 [SECURITY.md](SECURITY.md)，验收范围见 [发布就绪说明](docs/release-readiness.md)。
+MIT，见 [LICENSE](LICENSE)；上游方法致谢见 [第三方声明](THIRD_PARTY_NOTICES.md)。示例为合成内容，不包含真实用户会话。贡献与反馈见 [CONTRIBUTING.md](CONTRIBUTING.md)，漏洞处理见 [SECURITY.md](SECURITY.md)，验收范围见 [发布就绪说明](docs/release-readiness.md)。

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Add a packaged, versioned evidence-daily-review skill and quality rubric, informed by gstack `/retro`; retain pinned provenance and MIT notices.
+- Select evidence from the whole day with repeated-noise limits and project/session rotation for bounded model input; disclose omitted candidates.
+- Add dated, bounded three-day prior context without counting it as today's work.
+- Explicitly load the skill for the optional model adapter; validate review sections, evidence scopes, prior-only and intent-only outcome boundaries, and next-action acceptance criteria.
+- Keep nightly `daily` rules-only; no new external calls, source access or publication permissions.
+- Add synthetic quality regression cases and installed-resource acceptance checks. Semantic accuracy still requires human review.
+
 ## 0.3.0
 
 - Add separate Markdown/Obsidian output with `reports_dir` and `init --reports-dir`; retain JSON, SQLite, cursors and plans in private state.

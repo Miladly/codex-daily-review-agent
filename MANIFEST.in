@@ -6,3 +6,6 @@ include examples/sample-review.md
 recursive-include daily_review *.py
 recursive-include tests *.py
 global-exclude *.pyc *.jsonl *.sqlite* *.db .env* config.local.json .notion_token
+include THIRD_PARTY_NOTICES.md docs/review-method-sources.md
+recursive-include daily_review/skills *.md
+include .agents/skills/evidence-daily-review/SKILL.md

@@ -221,7 +221,9 @@ class AgentCase(AgentFixture):
         manual.write_text("我的最终反思必须保留")
         save_report(self.db, self.cfg, self.report())
         self.assertIn("我的最终反思必须保留", path.read_text())
-        self.assertEqual(report["projects"][0]["sessions"][0]["completed"][0]["evidence"], "B")
+        self.assertEqual(report["projects"][0]["sessions"][0]["completed"][0]["evidence"], "A")
+        self.assertTrue(all(c["evidence"] == "C" for c in report["projects"][0]["sessions"][0]["next_steps"]))
+        self.assertIn("B", {e["evidence"] for e in report["evidence_index"].values()})
         self.assertTrue(report["evidence_index"])
         self.assertTrue(path.with_suffix(".json").exists())
         with path.open("a") as f:
@@ -258,7 +260,7 @@ class AgentCase(AgentFixture):
         data = minimized_input(report)
         result = {"sessions": [{"key": s["key"], "claims": []} for s in data["sessions"]],
                   "projects": [{"key": p["key"], "claims": []} for p in data["projects"]],
-                  "daily": {"key": data["date"], "claims": [data["sessions"][0]["claims"][0]]}}
+                  "daily": {"key": data["date"], "claims": [{k: v for k, v in dict(data["sessions"][0]["claims"][0], section="goals", acceptance="").items() if k != "section_hint"}]}}
         class Proc:
             returncode = 0
             def __init__(self, cmd, **kwargs):
@@ -297,8 +299,11 @@ class AgentCase(AgentFixture):
 
     def test_model_refs_levels_and_scope(self):
         self.seed()
+        self.write([message("已完成来源检查。")], mode="a")
+        self.scan()
         data = minimized_input(self.report())
         c = next(c for c in data["sessions"][0]["claims"] if c["evidence"] == "B")
+        c = {k: v for k, v in dict(c, section="progress", acceptance="").items() if k != "section_hint"}
         result = {"sessions": [{"key": s["key"], "claims": []} for s in data["sessions"]],
                   "projects": [{"key": p["key"], "claims": []} for p in data["projects"]],
                   "daily": {"key": data["date"], "claims": [copy.deepcopy(c)]}}

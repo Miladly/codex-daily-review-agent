@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-daily-review-agent"
-version = "0.3.0"
+version = "0.4.0"
 description = "Local-first, read-only Codex daily reviews with evidence and optional approved Notion sync"
 readme = "README.md"
 license = {text = "MIT"}
@@ -14,5 +14,11 @@ dependencies = []
 [project.scripts]
 daily-review = "daily_review.cli:main"
 
+[tool.setuptools]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+
 [tool.setuptools.packages.find]
 include = ["daily_review*"]
+
+[tool.setuptools.package-data]
+daily_review = ["skills/evidence-daily-review/SKILL.md", "skills/evidence-daily-review/references/quality.md"]

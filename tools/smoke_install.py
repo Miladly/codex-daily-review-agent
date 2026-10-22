@@ -84,6 +84,8 @@ def main():
         reviewed = run('review', '--date', '2026-01-15')
         assert Path(reviewed['markdown']) == note
         assert Path(reviewed['json']) == root/'var/reports/2026-01-15.json'
+        payload = json.loads(Path(reviewed['json']).read_text())
+        assert payload['review_method']['version'] == '1.0.0' and len(payload['review_method']['sha256']) == 64
         assert Path(reviewed['json']).exists() and not list((root/'notes').rglob('*.json'))
         conflict = root/'notes/2026-01-16.md'
         conflict.write_text('An existing personal note.\n')

@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
 from .util import atomic_write, digest, now, redact, write_json
+from .method import choose, is_plan, PLAN, DECISION, PROBLEM, method_metadata, LABELS
 
 LEVELS = {"A": "日志中可观察的工具结果；不自动证明科研结论", "B": "会话中的陈述，未独立核实", "C": "意图、计划或证据不足"}
 
@@ -40,25 +41,34 @@ def unique_claims(claims, limit=16):
 
 def summarize_session(sid, pid, name, events):
     finals = [e for e in events if e["kind"] == "statement" and json.loads(e["details"]).get("phase") in ("final", "final_answer", "unspecified", None)]
-    plans = [e for e in finals if re.search(r"将|计划|建议|暂按", e["text"][:160])
-             and not re.search(r"已完成|已按|已生成|已保存|已提交|已检查|测试通过|已修复", e["text"][:160])]
+    plans = [e for e in finals if is_plan(e)]
     observed = [e for e in events if e["kind"] in ("file_change", "command")]
     errors = [e for e in events if e["kind"] in ("command_error", "tool_error", "file_change_error")]
-    # The latest final statements usually describe the outcome, but remain B evidence.
-    completed = [claim(e) for e in finals if e not in plans][-4:] + [claim(e) for e in observed[-4:]]
-    findings = [claim(e) for e in errors[-3:]]
-    findings += [claim(e) for e in finals if re.search(r"发现|问题|限制|尚未|未完成|失败|待证|不确定", e["text"])][-3:]
-    next_steps = [claim(e) for e in finals if e in plans or re.search(r"下一步|接下来|建议|待办|仍需", e["text"])][-3:]
+    # Score the entire day instead of retaining only the final retries.
+    completed = [claim(e) for e in choose([e for e in finals if e not in plans], 4)]
+    completed += [claim(e) for e in choose(observed, 4)]
+    findings = [claim(e) for e in choose(errors, 3)]
+    findings += [claim(e) for e in choose([e for e in finals if PROBLEM.search(e['text'])], 3)]
+    next_steps = [claim(e) for e in choose([e for e in finals if e in plans or PLAN.search(e['text'])], 3)]
     for c in next_steps:
         c["evidence"] = "C"
-    intents = [claim(e) for e in events if e["kind"] == "intent"]
+    intents = [claim(e) for e in choose([e for e in events if e['kind'] == 'intent'], 3)]
+    decisions = [claim(e) for e in choose([e for e in finals if DECISION.search(e['text'])], 2)]
+    pools = {'goals': intents[:2], 'progress': unique_claims(completed, 8), 'decisions': decisions,
+             'blockers': unique_claims(findings, 6), 'next_steps': unique_claims(next_steps, 4)}
+    candidates = []
+    for index in range(max((len(value) for value in pools.values()), default=0)):
+        for section, rows in pools.items():
+            if index < len(rows):
+                candidates.append(dict(rows[index], section_hint=section))
     return {"session_id": sid, "project_id": pid, "project_name": name,
             "start": events[0]["timestamp"], "end": events[-1]["timestamp"],
             "cwds": sorted({e["cwd"] for e in events}), "event_count": len(events),
             "evidence_counts": dict(collections.Counter(e["evidence"] for e in events)),
-            "intents": intents[:3], "completed": unique_claims(completed, 8),
+            "intents": intents, "goals": intents[:2], "decisions": decisions,
+            "candidates": candidates[:20], "completed": unique_claims(completed, 8),
             "findings": unique_claims(findings, 6), "next_steps": unique_claims(next_steps, 4),
-            "selection": "规则选取末段陈述及工具事件；完整脱敏事件保存在本地 SQLite，可追溯。"}
+            "selection": "按全天成果、决定与问题信号选材并限制重复；规则选材仍可能遗漏，完整脱敏事件留在本地 SQLite。"}
 
 
 def build_report(db, date, tzname):
@@ -66,11 +76,15 @@ def build_report(db, date, tzname):
     tz = ZoneInfo(tzname)
     lower = datetime.combine(date, time.min, tzinfo=tz)
     upper = datetime.combine(date + timedelta(days=1), time.min, tzinfo=tz)
+    context_lower = lower-timedelta(days=3)
     # Parse timestamps instead of comparing strings with differing offsets.
-    events = []
+    events, prior = [], []
     for r in db.execute("SELECT e.* FROM events e JOIN sessions s ON e.session_id=s.id WHERE s.excluded=0 ORDER BY e.timestamp,e.id"):
-        if lower <= datetime.fromisoformat(r["timestamp"]) < upper:
+        stamp = datetime.fromisoformat(r['timestamp'])
+        if lower <= stamp < upper:
             events.append(dict(r))
+        elif context_lower <= stamp < lower:
+            prior.append(dict(r))
     grouped = collections.defaultdict(list)
     for e in events:
         grouped[(e["project_id"], e["session_id"])].append(e)
@@ -80,22 +94,40 @@ def build_report(db, date, tzname):
         ss = [s for s in sessions if s["project_id"] == pid]
         p = {"project_id": pid, "name": ss[0]["project_name"], "sessions": ss,
              "event_count": sum(s["event_count"] for s in ss)}
-        for section in ("completed", "findings", "next_steps"):
+        for section in ("completed", "findings", "next_steps", "goals", "decisions"):
             p[section] = unique_claims([c for s in ss for c in s[section]])
         projects.append(p)
+    context, context_events = [], []
+    queues = []
+    for pid in sorted({p['project_id'] for p in projects}):
+        eligible = [e for e in prior if e['project_id'] == pid and (is_plan(e) or PROBLEM.search(e['text']) or DECISION.search(e['text']))]
+        queues.append(choose(eligible, 3))
+    while any(queues) and len(context) < 12:
+        for queue in queues:
+            if not queue or len(context) >= 12:
+                continue
+            e = queue.pop(0)
+            c = claim(e)
+            if is_plan(e):
+                c['evidence'] = 'C'
+            context.append({'project_id': e['project_id'], 'date': datetime.fromisoformat(e['timestamp']).astimezone(tz).date().isoformat(),
+                            'claim': c, 'kind': e['kind']})
+            context_events.append(e)
     evidence = {}
-    for e in events:
+    for e in events+context_events:
         refs = [dict(r) for r in db.execute("SELECT path,byte_offset,line,record_hash FROM provenance WHERE event_id=? ORDER BY path,byte_offset LIMIT 4", (e["id"],))]
         evidence[e["id"]] = {"session_id": e["session_id"], "timestamp": e["timestamp"],
-                              "kind": e["kind"], "evidence": e["evidence"], "sources": refs}
+                              "kind": e["kind"], "evidence": e["evidence"], "sources": refs,
+                              "period": "today" if lower <= datetime.fromisoformat(e['timestamp']) < upper else "prior"}
     report = {"version": 1, "date": str(date), "timezone": tzname, "status": "AI草稿",
               "backend": "rules", "generated_at": now(), "evidence_levels": LEVELS,
               "coverage": {"projects": len(projects), "sessions": len({s["session_id"] for s in sessions}),
                            "events": len(events), "evidence_counts": dict(collections.Counter(e["evidence"] for e in events)),
                            "ingest_issues_total": db.execute("SELECT count(*) FROM issues").fetchone()[0]},
               "projects": projects, "evidence_index": evidence,
+              "review_method": method_metadata(), "prior_context": {'lookback_days': 3, 'claims': context},
               "daily": {section: unique_claims([c for p in projects for c in p[section]], 24)
-                        for section in ("completed", "findings", "next_steps")},
+                        for section in ("completed", "findings", "next_steps", "goals", "decisions")},
               "suggestions": {"tasks": [], "knowledge": [], "requires_confirmation": True},
               "limitations": ["覆盖本机及已配置的只读 SSH 来源；归档与跨日延续均按事件时间采集。",
                               "不读取科研数据、不运行日志中的命令；退出码 0 和助手自述均不能证明科学结论。",
@@ -131,11 +163,27 @@ def render(report):
         out += ["来源事件数：" + "；".join(k + "=" + str(v) for k, v in sorted(origins.items())) + "。", ""]
     if cov.get("remote_sources"):
         out += ["远程采集：" + "；".join(r["source_id"] + "=" + r["status"] for r in cov["remote_sources"]) + "。", ""]
+    if report.get("review_method"):
+        method = report["review_method"]
+        out += [f'复盘方法：{method["name"]} v{method["version"]}；规则摘录与可选模型提炼共用证据边界。', '']
     if report.get("model_summary"):
-        out += ["### 结构化提炼", ""]
-        for c in report["model_summary"]["daily"]["claims"]:
-            out += [f'- [{c["evidence"]}] {c["text"]} （证据：{", ".join(x[:12] for x in c["refs"])}）']
-        out += [""]
+        out += ["### 结构化提炼（模型草稿，需审核）", ""]
+        for section, label in LABELS.items():
+            rows = [c for c in report["model_summary"]["daily"]["claims"] if c["section"] == section]
+            if rows:
+                out += ['#### '+label, '']
+                for c in rows:
+                    out += [f'- [{c["evidence"]}] {c["text"]} （证据：{", ".join(x[:12] for x in c["refs"])}）']
+                    if c["acceptance"]:
+                        out += ['  完成标准：'+c["acceptance"]]
+                out += ['']
+    for section in ('goals', 'decisions'):
+        rows = report.get('daily', {}).get(section, [])
+        if rows:
+            out += ['## '+LABELS[section], '']
+            for c in rows[:4]:
+                out += [f'- [{c["evidence"]}] {c["text"]} （证据：{", ".join(x[:12] for x in c["refs"])}）']
+            out += ['']
     for section, label in (("completed", "今日完成与结果"), ("findings", "问题/发现与决定"), ("next_steps", "下一步")):
         out += ["## " + label, ""]
         found = False
@@ -150,6 +198,13 @@ def render(report):
             out += [""]
         if not found:
             out += ["暂无足够日志证据，留待人工补充。", ""]
+    history = report.get('prior_context', {}).get('claims', [])
+    if history:
+        out += ['## 跨天延续（历史线索，尚未自动确认完成）', '', '以下来自活跃项目近三天的有限记录，不计入今日成果；是否解决需核对当日证据。', '']
+        for entry in history[:6]:
+            c = entry['claim']
+            out += [f'- {entry["date"]} [{c["evidence"]}] {c["text"]} （证据：{", ".join(x[:12] for x in c["refs"])}）']
+        out += ['']
     out += ["## 相关笔记/实验与产物链接", "", "以下为本地日志证据定位；日志记录的文件变更不保证产物当前可用。", ""]
     for p in report["projects"]:
         out += [f'### {p["name"]}（{p["project_id"]}）', ""]
@@ -158,7 +213,8 @@ def render(report):
                     '  工作区：' + "; ".join(s["cwds"])]
         out += [""]
     out += ["### 证据索引", "", "完整索引见同名 JSON 与 SQLite；这里列出正文引用。", ""]
-    used = {r for p in report["projects"] for sec in ("completed", "findings", "next_steps") for c in p[sec] for r in c["refs"]}
+    used = {r for p in report["projects"] for sec in ("completed", "findings", "next_steps", "goals", "decisions") for c in p.get(sec, []) for r in c["refs"]}
+    used.update(ref for entry in history[:6] for ref in entry['claim']['refs'])
     if report.get("model_summary"):
         used.update(r for c in report["model_summary"]["daily"]["claims"] for r in c["refs"])
     for eid in sorted(used):
