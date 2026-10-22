@@ -20,6 +20,9 @@ Core drafts require only Python and existing Codex session logs. SSH, Git worktr
 - Offline migration preview without writes; applied verified copies, original/configuration backup retention, conflicts, interruption/resume and concurrent editing protection.
 - Installed-wheel initialization, migration and regeneration in a separate synthetic notes folder; no real Obsidian account, model, server or Notion credential is used.
 
+- Factual records precede review notes in both rule and optional model output; date/project/result metadata survives JSON and SQLite storage.
+- Later repair/provisional approval, early delivery under retry noise, model record evidence boundaries and safe recorded artifact navigation use synthetic regression cases.
+
 ## Audit policy
 
 The publishable history contains only generic code, documentation and synthetic fixtures. No credential, path or rule exceptions are installed for the independent scanner. Privacy audit reports and personal identifier lists remain outside the repository. Recheck the full history and distribution contents before every public release.

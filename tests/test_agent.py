@@ -260,7 +260,7 @@ class AgentCase(AgentFixture):
         data = minimized_input(report)
         result = {"sessions": [{"key": s["key"], "claims": []} for s in data["sessions"]],
                   "projects": [{"key": p["key"], "claims": []} for p in data["projects"]],
-                  "daily": {"key": data["date"], "claims": [{k: v for k, v in dict(data["sessions"][0]["claims"][0], section="goals", acceptance="").items() if k != "section_hint"}]}}
+                  "daily": {"key": data["date"], "claims": [{k: v for k, v in dict(next(c for c in data["sessions"][0]["claims"] if c["section_hint"]=="goals"), section="goals", acceptance="").items() if k != "section_hint"}]}}
         class Proc:
             returncode = 0
             def __init__(self, cmd, **kwargs):

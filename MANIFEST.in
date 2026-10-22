@@ -9,3 +9,4 @@ global-exclude *.pyc *.jsonl *.sqlite* *.db .env* config.local.json .notion_toke
 include THIRD_PARTY_NOTICES.md docs/review-method-sources.md
 recursive-include daily_review/skills *.md
 include .agents/skills/evidence-daily-review/SKILL.md
+include docs/journal-format.md

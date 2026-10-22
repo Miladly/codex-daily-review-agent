@@ -45,7 +45,7 @@ def parser():
         q = sub.add_parser(cmd, help="render a draft" if cmd == "review" else "collect then render a draft")
         q.add_argument("--date", help="YYYY-MM-DD, default today in configured timezone")
         q.add_argument("--backend", choices=["rules", "codex"], default="rules", help="codex sends only bounded redacted excerpts to the model")
-        q.add_argument("--model-timeout", type=int, default=90)
+        q.add_argument("--model-timeout", type=int, default=240)
     q = sub.add_parser("model-preview", help="write exact minimized model input locally, no model call")
     q.add_argument("--date", required=True)
     q = sub.add_parser("notion-plan", help="default offline dry-run; --online only reads Notion")
@@ -136,7 +136,7 @@ def main(argv=None):
                           "backend": report["backend"], "collection": stats, "model_error": error})
                     return 2 if error or (stats and (stats["source_errors"] or stats["issues"])) else 0
                 if args.command == "model-preview":
-                    report = stored_report(db, args.date, cfg["timezone"])
+                    report = build_report(db, args.date, cfg["timezone"])
                     path = state / "model-input" / (args.date + ".json")
                     write_json(path, minimized_input(report))
                     emit({"preview": str(path), "network_calls": 0})

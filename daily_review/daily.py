@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from .remote import collect_all
 from .notion import make_plan
 from .review import build_report, save_report
+from .journal import FORMAT_VERSION
 from .util import digest, now, write_json
 
 
@@ -44,11 +45,12 @@ def run_daily(db, cfg, through="today", days=3):
         plan_path = Path(cfg["state_dir"]) / "notion-plans" / (date + ".dry-run.json")
         write_json(plan_path, plan)
         results.append({"date": date, "status": "draft", "changed": changed, "markdown": str(path),
-                        "coverage": report["coverage"], "notion_plan": str(plan_path),
+                        "coverage": report["coverage"], "format": report["format"], "work_records": len(report["work_records"]),
+                        "notion_plan": str(plan_path),
                         "projects_to_create": len(plan.get("create_projects", [])),
                         "unmatched_projects": len(plan["unmatched_projects"])})
     result = {"status": "attention" if stats["issues"] or stats["source_errors"] else "ok", "ran_at": now(),
-              "timezone": cfg["timezone"], "collection": stats, "days": results,
+              "timezone": cfg["timezone"], "format": FORMAT_VERSION, "collection": stats, "days": results,
               "changed_days": sum(r["changed"] for r in results), "remote_writes": 0, "model_calls": 0}
     root = Path(cfg["state_dir"]) / "runs"
     write_json(root / "last-run.json", result)

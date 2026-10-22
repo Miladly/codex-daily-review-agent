@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Make factual work records the main body, followed by separate review thoughts, next actions, manual additions and source detail.
+- Add stable date/project/session record metadata, recorded result/status and artifact navigation for later weekly/monthly aggregation; keep rule records when optional model records enrich the page.
+- Prioritize both early delivery and the latest recorded session state, with chronological presentation and bounded excerpts; historical/intent-only evidence cannot become today's model work record.
+- Update the packaged skill to 1.1.0, its rubric, scheduling guide and synthetic journal example. Default daily runs remain model-free and do not publish notes.
+- Preserve existing manual content, privacy checks, Codex-only release scope and offline installed-wheel validation.
+
 ## 0.4.0
 
 - Add a packaged, versioned evidence-daily-review skill and quality rubric, informed by gstack `/retro`; retain pinned provenance and MIT notices.

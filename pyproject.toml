@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-daily-review-agent"
-version = "0.4.0"
+version = "0.5.0"
 description = "Local-first, read-only Codex daily reviews with evidence and optional approved Notion sync"
 readme = "README.md"
 license = {text = "MIT"}

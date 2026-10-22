@@ -31,6 +31,8 @@ class DailyBatchCase(AgentFixture):
             before = path.read_bytes()
             second = run_daily(self.db, self.cfg, "2026-10-21", 3)
         self.assertEqual(first["changed_days"], 1)
+        self.assertEqual(first["format"], "record-review-1")
+        self.assertTrue(next(d for d in first["days"] if d["status"]=="draft")["work_records"])
         self.assertEqual(second["changed_days"], 0)
         self.assertEqual(second["remote_writes"], 0)
         self.assertEqual(second["model_calls"], 0)

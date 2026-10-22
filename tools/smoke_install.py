@@ -85,7 +85,10 @@ def main():
         assert Path(reviewed['markdown']) == note
         assert Path(reviewed['json']) == root/'var/reports/2026-01-15.json'
         payload = json.loads(Path(reviewed['json']).read_text())
-        assert payload['review_method']['version'] == '1.0.0' and len(payload['review_method']['sha256']) == 64
+        assert payload['format'] == 'record-review-1' and payload['work_records']
+        assert 'result' in payload['work_records'][0] and payload['work_records'][0]['project_id']
+        assert note.read_text().index('## 分项目工作记录') < note.read_text().index('## 复盘思考')
+        assert payload['review_method']['version'] == '1.1.0' and len(payload['review_method']['sha256']) == 64
         assert Path(reviewed['json']).exists() and not list((root/'notes').rglob('*.json'))
         conflict = root/'notes/2026-01-16.md'
         conflict.write_text('An existing personal note.\n')

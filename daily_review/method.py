@@ -5,11 +5,11 @@ import json
 import re
 from .util import digest
 
-SECTIONS = ('goals', 'progress', 'decisions', 'blockers', 'next_steps', 'continuity')
-LABELS = {'goals': '目标与范围', 'progress': '今日进展与验证', 'decisions': '关键决定与依据',
+SECTIONS = ('work_records', 'goals', 'progress', 'decisions', 'blockers', 'next_steps', 'continuity')
+LABELS = {'work_records': '每日工作记录', 'goals': '目标与范围', 'progress': '今日进展与验证', 'decisions': '关键决定与依据',
           'blockers': '阻塞、偏差与待证问题', 'next_steps': '下一步与完成标准', 'continuity': '跨天延续'}
 PLAN = re.compile(r'计划|建议|下一步|接下来|尚需|仍需|待办|准备|\b(?:plan(?:ned)?|next step|todo|intend|will)\b', re.I)
-OUTCOME = re.compile(r'已完成|已交付|已生成|已提交|已保存|已修复|测试通过|完成了|\b(?:delivered|completed|implemented|fixed|saved|passed|finished)\b', re.I)
+OUTCOME = re.compile(r'已完成|已交付|已生成|已提交|已保存|已修复|已修正|已落实|已部署|暂定稿|阶段定稿|测试通过|完成了|\b(?:delivered|completed|implemented|fixed|saved|passed|finished)\b', re.I)
 DECISION = re.compile(r'决定|选择|采用|改为|取消|取舍|\b(?:decided|decision|chose|chosen|switch(?:ed)?)\b', re.I)
 PROBLEM = re.compile(r'问题|限制|尚未|未完成|失败|待证|不确定|阻塞|\b(?:fail(?:ed|ure)?|blocked|unresolved|uncertain|limitation)\b', re.I)
 
@@ -19,7 +19,7 @@ def profile():
     folder = files('daily_review').joinpath('skills', 'evidence-daily-review')
     instruction = folder.joinpath('SKILL.md').read_text(encoding='utf-8')
     rubric = folder.joinpath('references', 'quality.md').read_text(encoding='utf-8')
-    return {'name': 'evidence-daily-review', 'version': '1.0.0',
+    return {'name': 'evidence-daily-review', 'version': '1.1.0',
             'sha256': digest(instruction+'\n'+rubric), 'instructions': instruction, 'rubric': rubric}
 
 

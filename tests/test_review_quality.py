@@ -144,7 +144,7 @@ class ReviewQualityCase(AgentFixture):
             summarize(report, self.cfg)
         self.assertIn(profile()["instructions"], prompts[0])
         self.assertIn(profile()["rubric"], prompts[0])
-        self.assertEqual(method_metadata()["version"], "1.0.0")
+        self.assertEqual(method_metadata()["version"], "1.1.0")
         self.assertEqual(len(method_metadata()["sha256"]), 64)
 
     def test_model_render_includes_observable_acceptance(self):
