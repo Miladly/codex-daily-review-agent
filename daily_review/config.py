@@ -9,6 +9,20 @@ from .util import atomic_write, under
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def resolve_reports_dir(value, cfg, base, config_file=None):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError('reports_dir must be a nonempty path string')
+    target = Path(value).expanduser()
+    target = (target if target.is_absolute() else Path(base)/target).resolve()
+    if under(cfg['state_dir'], target):
+        raise ValueError('reports_dir must not contain the private state directory')
+    if config_file is not None and under(config_file, target):
+        raise ValueError('reports_dir must not contain the private configuration')
+    if under(target, cfg['codex_home']) or under(cfg['codex_home'], target):
+        raise ValueError('reports_dir must not overlap CODEX_HOME')
+    return str(target)
+
+
 def config_path(path=None):
     if path:
         return Path(path).expanduser().resolve()
@@ -36,7 +50,7 @@ def load(path=None):
         raw = json.loads(path.read_text())
         if not isinstance(raw, dict):
             raise ValueError('configuration must be a JSON object')
-        allowed = set(cfg) | {'codex_binary', 'model'}
+        allowed = set(cfg) | {'codex_binary', 'model', 'reports_dir'}
         if set(raw) - allowed:
             raise ValueError('unknown configuration field; credentials belong in env/Keychain, not JSON')
         notion = raw.pop('notion', {})
@@ -54,6 +68,7 @@ def load(path=None):
         cfg[key] = absolute(cfg[key])
     if under(cfg['state_dir'], cfg['codex_home']):
         raise ValueError('state_dir must be outside CODEX_HOME, before creating any local state')
+    cfg['reports_dir'] = resolve_reports_dir(cfg.get('reports_dir', str(Path(cfg['state_dir'])/'reports')), cfg, base, path)
     try:
         ZoneInfo(cfg['timezone'])
     except (ZoneInfoNotFoundError, TypeError, ValueError):
@@ -64,7 +79,7 @@ def load(path=None):
     if not all(isinstance(x, str) for x in cfg['exclude_session_ids']):
         raise ValueError('exclude_session_ids must contain strings')
     # Required exclusions are additive: an empty example list cannot remove them.
-    cfg['exclude_cwds'] = list(dict.fromkeys([str(ROOT), cfg['state_dir']] + [absolute(x) for x in cfg['exclude_cwds']]))
+    cfg['exclude_cwds'] = list(dict.fromkeys([str(ROOT), cfg['state_dir'], cfg['reports_dir']] + [absolute(x) for x in cfg['exclude_cwds']]))
     for rule in cfg['project_overrides']:
         if not isinstance(rule, dict) or not all(isinstance(rule.get(k), str) and rule[k] for k in ('cwd', 'key', 'name')):
             raise ValueError('project_overrides require cwd, key and name strings')
@@ -105,7 +120,7 @@ def load(path=None):
     return cfg
 
 
-def initialize(path, codex_home=None, timezone='Asia/Shanghai'):
+def initialize(path, codex_home=None, timezone='Asia/Shanghai', reports_dir=None):
     target = Path(path).expanduser().resolve()
     if target.exists():
         raise ValueError('configuration already exists; edit it explicitly, init never overwrites')
@@ -125,5 +140,7 @@ def initialize(path, codex_home=None, timezone='Asia/Shanghai'):
     data['codex_home'] = str(source)
     if under(target.parent/'var', source):
         raise ValueError('state_dir must be outside CODEX_HOME')
+    if reports_dir is not None:
+        data['reports_dir'] = resolve_reports_dir(reports_dir, {'state_dir': str(target.parent/'var'), 'codex_home': str(source)}, target.parent, target)
     atomic_write(target, json.dumps(data, ensure_ascii=False, indent=2)+'\n')
     return target

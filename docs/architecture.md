@@ -20,6 +20,8 @@ SSH runs the trusted parser in isolated Python with bytecode disabled and an in-
 
 The `daily` entry point collects once and refreshes a configurable day range, using content fingerprints that exclude generation time. No-change drafts remain stable. Manual reflections use a sidecar and are also preserved when edited beneath the reflection heading. Coverage reports count observations; they do not claim a complete account of offline work.
 
+`reports_dir` separates the Markdown reading/editing surface from private state. JSON, SQLite, cursors and plans stay in `state_dir`; only date notes and manual reflections use the notes path. Existing unmanaged/damaged notes and symlink paths fail closed. The offline migration module previews by default, locks on application, copies without overwrite and verifies source/destination hashes and concurrent changes before an atomic configuration switch. It keeps originals as snapshots and records a private configuration backup/manifest. It is not a bidirectional sync service.
+
 Notion uses date plus record type as its lookup key, fails on duplicate matches, verifies schema and project relation targets, and requires a fresh content-bound approval hash. A sync can resume from a verified local connector receipt. Existing human relations are retained. Confirmed/locked pages and modified managed content block updates. Pending knowledge and task suggestions are never directly created.
 
 The versioned `daily-review.events` JSON exchange is local/private and intentionally distinct from daily summary JSON. It includes event IDs, tool/origin, project IDs, evidence levels, optional observed commit hashes, and source references. It is an output contract, not permission to treat arbitrary imported data as verified evidence.

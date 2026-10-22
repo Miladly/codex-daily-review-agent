@@ -1,6 +1,6 @@
 # Codex Daily Review Agent
 
-把分散在 Codex 本机与 SSH 服务器上的工作会话，整理为可追溯、待人工审核的每日复盘。
+把分散在 Codex 本机与 SSH 服务器上的工作会话，整理为可追溯的本地 Markdown 日报；用 Obsidian 或其他编辑器阅读、补充反思，按需发布到 Notion。
 
 **本地优先 · 默认无模型调用 · 默认不写 Notion · 不执行会话里的命令**
 
@@ -12,6 +12,8 @@
 - 使用字节游标、完整行边界、前缀/尾部指纹和 SQLite 事务恢复增量读取；替换、截断及归档重读时去重。
 - 按真实 cwd 和 Git 公共目录归并工作区，支持 worktree、符号路径及本地 file URI。
 - 生成“会话 → 项目 → 日报”三级 JSON、Markdown 和证据索引，保留人工补充。
+- Markdown 可独立输出到 Obsidian 笔记库；JSON、SQLite、游标与配置留在私有状态目录。
+- 提供先预览、后校验复制的笔记迁移；保护同名个人笔记、人工反思与原文件。
 - 区分 A（可观察工具记录）、B（会话陈述）、C（意图/计划）；退出码 0 不等于科研结论已验证。
 - 可选只读 SSH 采集：服务器内存解析，仅回传脱敏事件和游标；不安装远程文件或服务。
 - 可选 Codex 非交互式结构化总结，以及经过具体草稿审批的 Notion 同步。
@@ -26,29 +28,47 @@ cd codex-daily-review-agent
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-python -m daily_review init
+python -m daily_review init --reports-dir "~/Documents/DailyReview"
 python -m daily_review doctor
 python -m daily_review daily --through today --days 3
 ```
 
 当前仓库仍为私有，下载需要仓库访问权限；公开后同一安装流程可用。也可下载 ZIP，解压并进入目录后从创建虚拟环境一步开始。
 
-`init` 生成权限为 0600 的 `config.local.json`，不会覆盖已有配置。默认来源为 `CODEX_HOME` 或 `~/.codex`；非标准位置可运行 `python -m daily_review init --codex-home PATH --timezone UTC`。请查看生成的配置，填写自己的排除目录。**复盘项目目录默认排除；若在别处运行 Agent，应额外填写相应工作目录和会话 ID。**
+`init` 生成权限为 0600 的 `config.local.json`，不会覆盖已有配置。`--reports-dir` 指定 Markdown 文件夹；省略时沿用 `var/reports`。默认来源为 `CODEX_HOME` 或 `~/.codex`；非标准位置可用 `--codex-home PATH`，时区可用 `--timezone UTC`。请查看生成的配置，填写自己的排除目录。**程序、私有状态与笔记输出目录默认排除；若在别处运行 Agent，应额外填写相应工作目录和会话 ID。**
 
 日志目录缺失时 `doctor` 与 `daily` 返回退出码 2，提示修正路径或先创建 Codex 会话，不会声称“没有工作”。Codex CLI 缺失只影响可选模型后端，不影响规则摘要。
 
-输出默认位于配置文件旁的 `var/`（仓库内直接运行时也为 `var/`）：
+上述示例的 Markdown 位于 `~/Documents/DailyReview`。在 Obsidian 仓库管理器选择 **Open folder as vault / 打开文件夹作为仓库**，打开该文件夹即可，不需要插件或每天导入。其他编辑器也可直接打开。
+
+完整操作见 [简明手册](docs/usage.md)、[Obsidian 与迁移](docs/obsidian.md)。下载项目不会自动创建定时任务；需要自行按 [定时运行指南](docs/scheduling.md) 配置。
+
+以下路径以配置文件旁的 `var/` 为私有状态根目录（可用 `state_dir` 调整）：
 
 | 文件 | 用途 |
 |---|---|
-| `reports/YYYY-MM-DD.md` | 待审核日报 |
+| `reports/YYYY-MM-DD.md` | 未设置 `reports_dir` 时的日报位置；设置后写到指定笔记目录 |
 | `reports/YYYY-MM-DD.json` | 三级结构、证据定位和候选建议 |
-| `reports/manual/YYYY-MM-DD.md` | 人工补充，重跑保留 |
+| `reports/manual/YYYY-MM-DD.md` | 与 Markdown 一起保存；外部笔记目录中为 `manual/YYYY-MM-DD.md` |
 | `review.sqlite3` | 本地脱敏事件、游标和同步状态 |
 | `runs/last-run.json` | 来源状态、计数和产物路径 |
 | `notion-plans/*.dry-run.json` | 离线同步预览，无远程写入 |
+| `migrations/` | 执行迁移时的私有配置备份和哈希清单 |
 
-`var/` 包含私密数据，**不能跟源码一起上传或分享**。自动脱敏不能保证任意自然语言均不含隐私。
+`var/` 和外部笔记目录都包含私密数据，**不能跟源码一起上传或分享**。仓库的 `var/` 忽略规则不保护其他位置的笔记，请检查自己的 Git/云同步设置。自动脱敏不能保证任意自然语言均不含隐私。
+
+## 已有日报迁到 Obsidian
+
+```sh
+# 默认仅预览，不写文件或修改配置
+python -m daily_review migrate-reports --to "~/Documents/DailyReview"
+# 核对预览后复制、校验，并切换活动输出目录
+python -m daily_review migrate-reports --to "~/Documents/DailyReview" --apply
+```
+
+原 Markdown 保留为快照，配置备份和清单留在私有状态目录。不会迁移 JSON/SQLite，也不会覆盖不同内容的同名文件。迁移后只在新笔记目录编辑，详细冲突和回退说明见 [迁移指南](docs/obsidian.md)。
+
+个人内容请写在日报末尾 **“人工补充与最终反思”** 下方；自动摘要区重跑会更新。不要删除管理标记和反思标题。若已有个人日记占用了同名文件，程序会报错保留，请选用专用子目录或先保存并更名原笔记。
 
 ## 常用操作
 
@@ -69,7 +89,7 @@ python3 -m unittest discover -s tests -v
 
 独立 wheel 安装后请在专用工作目录执行 `daily-review init`；从其他目录运行时使用 `daily-review --config PATH ...` 或设置 `DAILY_REVIEW_CONFIG`。相对配置路径始终以配置文件所在目录解释，运行数据不会写入 Python 安装目录。
 
-每日运行建议使用你自己的调度工具调用 `daily --through today --days 3`。它会回补最近三天；来源不可用时保留已有事件并返回不完整状态，不能将缺失记录解释为“没有工作”。本仓库不安装后台服务，不提供准点唤醒保证。休眠、网络及调度权限需要由运行环境处理。
+每日运行建议使用你自己的调度工具调用 `daily --through today --days 3`。它会回补最近三天；来源不可用时保留已有事件并返回不完整状态，不能将缺失记录解释为“没有工作”。例如自行设为 23:30，则当次是截至执行时的草稿，之后发生的工作会在下次补回原日期。本仓库不安装后台服务，不提供准点唤醒保证。休眠、网络及调度权限需要由运行环境处理，见 [定时运行指南](docs/scheduling.md)。
 
 ## 可选功能
 

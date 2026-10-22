@@ -9,10 +9,11 @@ import subprocess
 import sys
 
 MODULES = {'__init__', '__main__', 'cli', 'collector', 'config', 'daily', 'exchange', 'model',
-           'notion', 'projects', 'remote', 'remote_worker', 'review', 'store', 'util'}
+           'notion', 'projects', 'remote', 'remote_worker', 'review', 'store', 'util', 'migration'}
 ROOT_FILES = {'.gitignore', 'README.md', 'PRIVACY.md', 'LICENSE', 'pyproject.toml', 'config.example.json', 'MANIFEST.in', 'CONTRIBUTING.md', 'SECURITY.md', 'CHANGELOG.md'}
-DOCS = {'docs/architecture.md', 'docs/configuration.md', 'examples/sample-review.md', 'docs/release-readiness.md'}
-TESTS = {'tests/test_agent.py', 'tests/test_daily_and_projects.py', 'tests/test_remote.py', 'tests/test_release.py', 'tests/test_onboarding.py'}
+DOCS = {'docs/architecture.md', 'docs/configuration.md', 'examples/sample-review.md', 'docs/release-readiness.md',
+        'docs/obsidian.md', 'docs/usage.md', 'docs/scheduling.md', 'docs/notes-design.md'}
+TESTS = {'tests/test_agent.py', 'tests/test_daily_and_projects.py', 'tests/test_remote.py', 'tests/test_release.py', 'tests/test_onboarding.py', 'tests/test_notes.py'}
 
 
 def allowed(path):

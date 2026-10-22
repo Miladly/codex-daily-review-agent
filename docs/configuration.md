@@ -8,9 +8,12 @@ Supported platforms are macOS and Linux, Python 3.10+ with IANA timezone data. N
 
 The default timezone is `Asia/Shanghai`; set your own IANA timezone if desired. Exclude all directories and session IDs used by the reviewing agent. `CODEX_THREAD_ID`, when present, is excluded automatically. Keep exclusions in private configuration, not public examples.
 
+Optional `reports_dir` controls Markdown and its `manual/` reflection folder only. It defaults to `state_dir/reports`, preserving existing installations. `init --reports-dir PATH` configures it for a new installation; use `migrate-reports --to PATH` then `--apply` for existing notes. Relative paths resolve from the configuration directory. JSON, SQLite, cursors and plans stay under `state_dir`. A notes folder cannot overlap `CODEX_HOME` or contain private state. The notes directory is an additive self-exclusion. See [Obsidian and migration](obsidian.md).
+
 ```json
 {
   "timezone": "Asia/Shanghai",
+  "reports_dir": "~/Documents/DailyReview",
   "exclude_session_ids": [],
   "exclude_cwds": ["~/projects/my-review-agent"],
   "project_overrides": [
@@ -52,4 +55,6 @@ The approval hash detects content changes; it is not a substitute for human revi
 - Remote source unavailable: verify the exact SSH alias/port and known host first; use noninteractive credentials. Retained events remain available and reports state that coverage may be incomplete.
 - No `codex` binary: rules-based daily drafts still work. Only the explicit model backend needs the CLI and its own authentication/provider configuration.
 - Scheduling: invoke with absolute Python, config, and working-directory paths. A shell environment variable from an interactive terminal may not be present in a scheduler. No scheduler is installed by this repository.
+- Existing date note refused: keep your personal note and choose a dedicated output folder or rename it after backing up. Agent markers and the manual reflection heading must remain intact. Do not use force-overwrite workarounds.
+- Migration interrupted: original notes and the old configuration remain active until a verified switch. Identical copies can be reused by retrying; conflicting copies require human review. File systems that do not support the no-overwrite hard-link installation fail without a configuration switch.
 - Notion: default offline plans need no credential. Online access requires your own schema and IDs; see the preflight error before changing anything. Do not paste tokens or full diagnostic output into an issue.

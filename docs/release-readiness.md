@@ -16,6 +16,9 @@ Core drafts require only Python and existing Codex session logs. SSH, Git worktr
 - Wheel and source distribution contain only approved source/docs/tests/metadata, with no runtime database, log, credential or user mapping.
 - Complete Git history and metadata checked for secret patterns, workspace IDs, personal paths, email and private network addresses; an additional private exact-identifier comparison is done outside the repository.
 - Independent Gitleaks history and source scans, with offline reports and no upload of source to a scanning service.
+- External Markdown output with structured state retained privately, additive notes self-exclusion, same-name note/symlink protection and manual reflection preservation.
+- Offline migration preview without writes; applied verified copies, original/configuration backup retention, conflicts, interruption/resume and concurrent editing protection.
+- Installed-wheel initialization, migration and regeneration in a separate synthetic notes folder; no real Obsidian account, model, server or Notion credential is used.
 
 ## Audit policy
 

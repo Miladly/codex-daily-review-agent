@@ -7,7 +7,7 @@ import sys
 from zoneinfo import ZoneInfo
 from . import __version__
 from .collector import Collector
-from .config import load, initialize
+from .config import load, initialize, config_path
 from .model import doctor, minimized_input, summarize
 from .notion import Client, apply_plan, make_plan, remote_snapshot
 from .review import build_report, save_report
@@ -30,6 +30,10 @@ def parser():
     q = sub.add_parser("init", help="create private local configuration; never overwrite or contact external services")
     q.add_argument("--codex-home", help="source Codex directory, defaults to CODEX_HOME or ~/.codex")
     q.add_argument("--timezone", default="Asia/Shanghai")
+    q.add_argument("--reports-dir", help="optional Markdown/Obsidian folder; JSON and database stay in private state")
+    q = sub.add_parser("migrate-reports", help="preview copying Markdown to another folder; --apply copies and switches config with a backup")
+    q.add_argument("--to", required=True, help="destination folder, relative to the configuration file")
+    q.add_argument("--apply", action="store_true", help="copy verified notes and switch output; originals are retained")
     q = sub.add_parser("collect", help="read-only incremental ingestion")
     q.add_argument("--replay", action="store_true", help="re-read source files from zero with dedup; retain historical evidence")
     q = sub.add_parser("daily", help="collect local and configured SSH sources, refresh recent drafts; no model or Notion writes")
@@ -67,18 +71,22 @@ def main(argv=None):
         if os.name != "posix":
             raise RuntimeError("Supported platforms: macOS and Linux. On Windows use WSL2; native Windows locking is unsupported.")
         if args.command == "init":
-            path = initialize(args.config or os.environ.get("DAILY_REVIEW_CONFIG") or "config.local.json", args.codex_home, args.timezone)
+            path = initialize(args.config or os.environ.get("DAILY_REVIEW_CONFIG") or "config.local.json", args.codex_home, args.timezone, args.reports_dir)
             emit({"config": str(path), "remote_writes": 0, "model_calls": 0})
             return 0
         cfg = load(args.config)
         state = Path(cfg["state_dir"])
+        if args.command == "migrate-reports":
+            from .migration import migrate_reports
+            emit(migrate_reports(config_path(args.config), args.to, apply=args.apply))
+            return 0
         if args.command == "doctor":
             home = Path(cfg["codex_home"])
             available = home.is_dir() and any((home / name).is_dir() for name in ("sessions", "archived_sessions"))
             emit({"status": "ok" if available else "attention", "source_available": available,
                   "source_hint": "" if available else "No Codex sessions directory found; set codex_home or create a Codex session first.",
                   "version": __version__, "codex_home_env": os.environ.get("CODEX_HOME"),
-                  "resolved_codex_home": str(home), "state_dir": str(state), "timezone": cfg["timezone"],
+                  "resolved_codex_home": str(home), "state_dir": str(state), "reports_dir": cfg["reports_dir"], "timezone": cfg["timezone"],
                   "sessions": len(list((home / "sessions").rglob("*.jsonl"))),
                   "archived_sessions": len(list((home / "archived_sessions").rglob("*.jsonl"))),
                   "excluded_session_ids": cfg["exclude_session_ids"], "excluded_cwds": cfg["exclude_cwds"],
@@ -123,7 +131,7 @@ def main(argv=None):
                             error = redact(str(e), 500, True)
                             report["model_error"] = error
                             path = save_report(db, cfg, report)
-                    emit({"markdown": str(path), "json": str(path.with_suffix(".json")),
+                    emit({"markdown": str(path), "json": str(state / "reports" / (date + ".json")),
                           "sqlite": str(state / "review.sqlite3"), "coverage": report["coverage"],
                           "backend": report["backend"], "collection": stats, "model_error": error})
                     return 2 if error or (stats and (stats["source_errors"] or stats["issues"])) else 0

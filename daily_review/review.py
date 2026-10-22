@@ -173,12 +173,19 @@ def render(report):
 
 
 def save_report(db, config, report):
-    root = Path(config["state_dir"]) / "reports"
+    private_root = Path(config["state_dir"]) / "reports"
+    root = Path(config.get("reports_dir", private_root))
     date = report["date"]
+    path = root / (date + ".md")
     manual = root / "manual" / (date + ".md")
+    if path.is_symlink() or manual.is_symlink() or manual.parent.is_symlink():
+        raise ValueError("refusing a symlinked report or manual reflection")
+    if path.exists():
+        existing = path.read_text()
+        if not all(marker in existing for marker in ("<!-- DAILY_REVIEW_AGENT_BEGIN -->", "<!-- DAILY_REVIEW_AGENT_END -->", "## 人工补充与最终反思\n\n")):
+            raise ValueError("existing note is not intact Agent-managed content; preserved without overwrite")
     if not manual.exists():
         atomic_write(manual, "<!-- 人工区域：补充实际投入、个人判断与最终反思。 -->\n")
-    path = root / (date + ".md")
     # Preserve human edits made directly below the final reflection heading too.
     header = "## 人工补充与最终反思\n\n"
     hint = "请在同目录 manual/日期.md 填写；重跑会保留该文件并带入此处。"
@@ -196,7 +203,7 @@ def save_report(db, config, report):
             atomic_write(manual, merged)
     body = render(report) + manual.read_text()
     # Store human input in the separate stable file, not in the agent-managed JSON.
-    write_json(root / (date + ".json"), report)
+    write_json(private_root / (date + ".json"), report)
     atomic_write(path, body)
     with db:
         db.execute("INSERT OR REPLACE INTO reports VALUES(?,?,?,?,?)", (

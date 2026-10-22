@@ -70,11 +70,36 @@ def main():
         assert hashlib.sha256(log.read_bytes()).hexdigest() == original
         assert config.stat().st_mode & 0o777 == 0o600
         assert (root/'var/review.sqlite3').stat().st_mode & 0o777 == 0o600
+        config_before = config.read_bytes()
+        preview = run('migrate-reports', '--to', './notes')
+        assert preview['status'] == 'preview' and config.read_bytes() == config_before
+        assert not (root/'notes').exists()
+        migrated = run('migrate-reports', '--to', './notes', '--apply')
+        assert migrated['status'] == 'complete' and migrated['hashes_verified']
+        assert (Path(migrated['backup'])/'config.before.json').read_bytes() == config_before
+        note = root/'notes/2026-01-15.md'
+        assert note.read_bytes() == report.read_bytes()
+        run('daily', '--through', '2026-01-15', '--days', '3')
+        assert 'Synthetic manual reflection.' in note.read_text()
+        reviewed = run('review', '--date', '2026-01-15')
+        assert Path(reviewed['markdown']) == note
+        assert Path(reviewed['json']) == root/'var/reports/2026-01-15.json'
+        assert Path(reviewed['json']).exists() and not list((root/'notes').rglob('*.json'))
+        conflict = root/'notes/2026-01-16.md'
+        conflict.write_text('An existing personal note.\n')
+        run('review', '--date', '2026-01-16', expected=1)
+        assert conflict.read_text() == 'An existing personal note.\n'
+        separate = root/'fresh/config.local.json'
+        subprocess.run([str(python), '-m', 'daily_review', '--config', str(separate), 'init',
+                        '--codex-home', str(root/'codex'), '--reports-dir', './vault'],
+                       cwd=root, env=env, check=True, capture_output=True)
+        assert json.loads(separate.read_text())['reports_dir'] == str(root/'fresh/vault')
         entry = subprocess.run([str(root/'venv/bin/daily-review'), '--version'], cwd=root, env=env, check=True, capture_output=True, text=True)
         assert entry.stdout.strip() == version
     print(json.dumps({'status':'ok','version':version,'installed_outside_checkout':True,
                       'source_unchanged':True,'recorded_command_executed':False,'repeat_inserted':0,
                       'repeat_changed_days':0,'manual_preserved':True,'config_and_db_mode':'0600',
+                      'obsidian_output':True,'migration_preview_and_apply':True,'unmanaged_note_preserved':True,
                       'credentials_required':False,'model_calls':0,'external_writes':0}))
 
 
