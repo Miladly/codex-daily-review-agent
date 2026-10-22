@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Add explicit `daily --backend codex` for scheduled model-authored work journals and review notes; rules remain the default.
+- Reuse revalidated exact-input model answers across three-day backfills; invalidate on evidence, source completeness, method or configured model changes.
+- Persist factual drafts before calls; mark model failures, continue other dates and preserve manual reflection. Return metadata without private report content.
+- Document one-off versus standing authorization, model service data boundaries, cache privacy and fallback behavior.
+
+
 ## 0.5.0
 
 - Make factual work records the main body, followed by separate review thoughts, next actions, manual additions and source detail.

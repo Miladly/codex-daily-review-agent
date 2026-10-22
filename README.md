@@ -97,7 +97,7 @@ python3 -m unittest discover -s tests -v
 
 **SSH**：在本地私有配置的 `remote_sources` 中添加 SSH 别名。预先自行确认主机密钥和非交互认证，绝不关闭主机密钥校验。macOS 可复用 Keychain。配置和权限见 [配置说明](docs/configuration.md)。
 
-**模型总结**：`model-preview` 先导出将要发送的有限脱敏片段；审阅后可用 `review --backend codex`。这会把片段发送给你所配置的模型提供方，`daily` 默认不会调用模型。模型工具活动、无效证据引用和证据升级会被拒绝。模型会明确加载内置 skill 与质量量表，先保留项目与会话层的工作记录、产物和阶段结果，再提炼少量决定、问题、下一步和跨天延续；历史线索不会自动算作当日完成。规则后端按全天信号选材，仍是保守摘录。来源、许可证、适配范围和验证边界见 [复盘方法依据](docs/review-method-sources.md)。
+**模型总结**：`model-preview` 先导出将要发送的有限脱敏片段；审阅后可用 `review --backend codex`。这会把片段发送给你所配置的模型提供方，`daily` 默认不会调用模型。需要定时模型提炼时，在明确授权后使用 `daily --through today --days 3 --backend codex --model-timeout 360`；授权可覆盖指定日期，也可持续用于自己的定时任务，无需每天重复确认。同一输入会复用结果，失败时保留记录并提示未完成模型提炼，详见[调度说明](docs/scheduling.md)。模型工具活动、无效证据引用和证据升级会被拒绝。模型会明确加载内置 skill 与质量量表，先保留项目与会话层的工作记录、产物和阶段结果，再提炼少量决定、问题、下一步和跨天延续；历史线索不会自动算作当日完成。规则后端按全天信号选材，仍是保守摘录。来源、许可证、适配范围和验证边界见 [复盘方法依据](docs/review-method-sources.md)。
 
 **Notion**：复用你已有的工作记录和项目库，配置自己的 data source ID。令牌只从 `NOTION_TOKEN` 或 macOS Keychain 服务 `DailyReviewAgent.Notion` 读取。先生成 `notion-plan --online`，检查内容后用 `notion-sync --plan ... --approve ...` 执行。只更新 Agent 管理块；人工改动、已确认记录、重复日期/类型行等会阻止写入。不会自动修改 schema 或创建任务/知识；缺失项目补建需要显式配置和同次审批。
 

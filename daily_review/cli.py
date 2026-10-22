@@ -36,9 +36,11 @@ def parser():
     q.add_argument("--apply", action="store_true", help="copy verified notes and switch output; originals are retained")
     q = sub.add_parser("collect", help="read-only incremental ingestion")
     q.add_argument("--replay", action="store_true", help="re-read source files from zero with dedup; retain historical evidence")
-    q = sub.add_parser("daily", help="collect local and configured SSH sources, refresh recent drafts; no model or Notion writes")
+    q = sub.add_parser("daily", help="collect local and configured SSH sources, refresh recent drafts; optional model, no Notion writes")
     q.add_argument("--through", default="today", help="today, yesterday or YYYY-MM-DD in configured timezone")
     q.add_argument("--days", type=int, default=3, help="refresh this many days, default 3; no-event new days are skipped")
+    q.add_argument("--backend", choices=["rules", "codex"], default="rules", help="explicit opt-in sends bounded redacted excerpts to the model")
+    q.add_argument("--model-timeout", type=int, default=240)
     q = sub.add_parser("export-events", help="write versioned local interchange; private data, never upload with source")
     q.add_argument("--date", required=True)
     for cmd in ("review", "run"):
@@ -97,7 +99,7 @@ def main(argv=None):
             db = connect(state)
             try:
                 if args.command == "daily":
-                    result = run_daily(db, cfg, args.through, args.days)
+                    result = run_daily(db, cfg, args.through, args.days, args.backend, args.model_timeout)
                     emit(result)
                     return 2 if result["status"] == "attention" else 0
                 if args.command == "export-events":

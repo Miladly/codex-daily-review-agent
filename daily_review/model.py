@@ -77,7 +77,11 @@ def minimized_input(report):
     for p in report["projects"]:
         if p["project_id"] in active:
             projects.append({"key": p["project_id"], "name": redact(p["name"], 100, True)})
+    coverage = report.get("coverage", {})
     return {"date": report["date"], "projects": projects, "sessions": sessions,
+            "coverage": {"events": coverage.get("events", 0),
+                         "source_statuses": [r["status"] for field in ("local_sources", "remote_sources")
+                                             for r in coverage.get(field, [])]},
             "prior_context": context, "selected_evidence": selected, "source_constraints": sources,
             "review_method": method_metadata(), "excerpt_characters": budget,
             "selection": {"total_sessions": len(ordered), "selected_sessions": len(sessions),
@@ -228,11 +232,16 @@ def summarize(report, config, timeout=240):
         if proc.returncode or not answer.exists():
             raise RuntimeError("Codex returned no valid answer: " + redact(stderr, 350, True))
         result = validate_output(json.loads(answer.read_text()), data)
+    return apply_summary(report, result, {"path": str(preview), "excerpt_characters": data["excerpt_characters"],
+                                          "selected_evidence": len(data["selected_evidence"]), "cli": info["version"]})
+
+
+def apply_summary(report, result, metadata):
+    """Attach a validated answer; used by fresh calls and the exact-input cache."""
     report["backend"] = "codex"
     report["model_summary"] = result
     report["model_work_records"] = [dict(c, date=report["date"], project_id=g["key"])
                                      for g in result["projects"] for c in g["claims"] if c["section"] == "work_records"]
-    report["model_input"] = {"path": str(preview), "excerpt_characters": data["excerpt_characters"],
-                             "selected_evidence": len(data["selected_evidence"]), "cli": info["version"]}
+    report["model_input"] = metadata
     report["limitations"].append("模型仅使用有限脱敏摘录；引用和证据等级已校验，语义仍需人工审核。")
     return report
