@@ -6,6 +6,8 @@
 
 > This repository contains the Codex-only edition: a local-first, read-only session collector with evidence-linked daily drafts, optional SSH sources, and approval-gated Notion synchronization.
 
+**当前定位：v0.7.0 Beta。** 适合能够配置 Python 的 macOS/Linux 用户试用；安装项目不会自动配置定时任务。已补齐首次安装诊断、运行进度、漏跑检查和失败恢复，仍需用户维护运行环境。见[开源成熟度审计](docs/open-source-audit.md)。
+
 ## 能做什么
 
 - 扫描 `CODEX_HOME/sessions` 与 `archived_sessions`，按事件时间处理跨天延续会话。
@@ -43,7 +45,7 @@ python -m daily_review daily --through today --days 3
 
 上述示例的 Markdown 位于 `~/Documents/DailyReview`。在 Obsidian 仓库管理器选择 **Open folder as vault / 打开文件夹作为仓库**，打开该文件夹即可，不需要插件或每天导入。其他编辑器也可直接打开。
 
-完整操作见 [简明手册](docs/usage.md)、[Obsidian 与迁移](docs/obsidian.md)。下载项目不会自动创建定时任务；需要自行按 [定时运行指南](docs/scheduling.md) 配置。
+完整操作见 [简明手册](docs/usage.md)、[Obsidian 与迁移](docs/obsidian.md)、[首次使用与排错](docs/troubleshooting.md)。下载项目不会自动创建定时任务；需要自行按 [定时运行指南](docs/scheduling.md) 配置。
 
 以下路径以配置文件旁的 `var/` 为私有状态根目录（可用 `state_dir` 调整）：
 
@@ -72,6 +74,8 @@ python -m daily_review migrate-reports --to "~/Documents/DailyReview" --apply
 
 个人内容请写在日报末尾 **“人工补充与最终反思”** 下方；自动摘要区重跑会更新。不要删除管理标记和反思标题。若已有个人日记占用了同名文件，程序会报错保留，请选用专用子目录或先保存并更名原笔记。
 
+daily 运行时会在终端显示采集、模型、逐日保存的阶段信息；它只含元数据。最终 JSON 仍输出到 stdout，需要安静时加 `--quiet`。
+
 ## 常用操作
 
 ```sh
@@ -83,6 +87,10 @@ python3 -m daily_review collect --replay
 python3 -m daily_review review --date 2026-01-15
 # 导出有版本号的本地事件接口（仍是私密数据）
 python3 -m daily_review export-events --date 2026-01-15
+# 检查昨天的运行是否完成；不采集、不调用模型
+python3 -m daily_review status --through yesterday
+# 如要求模型复盘，检查该模式是否完成
+python3 -m daily_review status --through yesterday --backend codex
 # 无网络测试
 python3 -m unittest discover -s tests -v
 ```
@@ -97,7 +105,7 @@ python3 -m unittest discover -s tests -v
 
 **SSH**：在本地私有配置的 `remote_sources` 中添加 SSH 别名。预先自行确认主机密钥和非交互认证，绝不关闭主机密钥校验。macOS 可复用 Keychain。配置和权限见 [配置说明](docs/configuration.md)。
 
-**模型总结**：`model-preview` 先导出将要发送的有限脱敏片段；审阅后可用 `review --backend codex`。这会把片段发送给你所配置的模型提供方，`daily` 默认不会调用模型。需要定时模型提炼时，在明确授权后使用 `daily --through today --days 3 --backend codex --model-timeout 360`；授权可覆盖指定日期，也可持续用于自己的定时任务，无需每天重复确认。同一输入会复用结果，失败时保留记录并提示未完成模型提炼，详见[调度说明](docs/scheduling.md)。模型工具活动、无效证据引用和证据升级会被拒绝。模型会明确加载内置 skill 与质量量表，先保留项目与会话层的工作记录、产物和阶段结果，再提炼少量决定、问题、下一步和跨天延续；历史线索不会自动算作当日完成。规则后端按全天信号选材，仍是保守摘录。来源、许可证、适配范围和验证边界见 [复盘方法依据](docs/review-method-sources.md)。
+**模型总结**：需要兼容的 Codex CLI 与用户自己的登录/可用额度；先用 `doctor --backend codex` 检查接口；这不验证登录、额度或模型网络。`model-preview` 先导出将要发送的有限脱敏片段；审阅后可用 `review --backend codex`。这会把片段发送给你所配置的模型提供方，`daily` 默认不会调用模型。需要定时模型提炼时，在明确授权后使用 `daily --through today --days 3 --backend codex --model-timeout 360`；授权可覆盖指定日期，也可持续用于自己的定时任务，无需每天重复确认。同一输入会复用结果，失败时保留记录并提示未完成模型提炼，详见[调度说明](docs/scheduling.md)。模型工具活动、无效证据引用和证据升级会被拒绝。模型会明确加载内置 skill 与质量量表，先保留项目与会话层的工作记录、产物和阶段结果，再提炼少量决定、问题、下一步和跨天延续；历史线索不会自动算作当日完成。规则后端按全天信号选材，仍是保守摘录。来源、许可证、适配范围和验证边界见 [复盘方法依据](docs/review-method-sources.md)。
 
 **Notion**：复用你已有的工作记录和项目库，配置自己的 data source ID。令牌只从 `NOTION_TOKEN` 或 macOS Keychain 服务 `DailyReviewAgent.Notion` 读取。先生成 `notion-plan --online`，检查内容后用 `notion-sync --plan ... --approve ...` 执行。只更新 Agent 管理块；人工改动、已确认记录、重复日期/类型行等会阻止写入。不会自动修改 schema 或创建任务/知识；缺失项目补建需要显式配置和同次审批。
 

@@ -64,9 +64,16 @@ def connect(state_dir):
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = root / "review.sqlite3"
     db = sqlite3.connect(path, timeout=15)
-    os.chmod(path, 0o600)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA foreign_keys=ON")
-    db.executescript(SCHEMA)
+    try:
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (0, 1):
+            raise RuntimeError("local database uses a newer schema; use a compatible Agent version and preserve private backups")
+        os.chmod(path, 0o600)
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA foreign_keys=ON")
+        db.executescript(SCHEMA)
+    except BaseException:
+        db.close()
+        raise
     return db

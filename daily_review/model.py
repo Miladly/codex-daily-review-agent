@@ -11,15 +11,33 @@ from .method import SECTIONS, profile, method_metadata
 REQUIRED_FLAGS = ["--ephemeral", "--output-schema", "--ignore-user-config", "--skip-git-repo-check"]
 
 
+def resolve_binary(binary):
+    found = shutil.which(binary)
+    if found or binary != "codex":
+        return found
+    # Observed macOS desktop layout; an explicit configuration always wins.
+    for apps in (Path("/Applications"), Path.home() / "Applications"):
+        candidate = apps / "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
 def doctor(binary="codex"):
-    exe = shutil.which(binary)
+    exe = resolve_binary(binary)
     if not exe:
-        return {"available": False, "error": "codex not on PATH"}
-    version = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10)
-    help_result = subprocess.run([exe, "exec", "--help"], capture_output=True, text=True, timeout=10)
+        return {"available": False, "error": "codex executable not found",
+                "hint": "Install Codex CLI or set codex_binary to its absolute executable path; rules mode still works."}
+    try:
+        version = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10)
+        help_result = subprocess.run([exe, "exec", "--help"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return {"available": False, "binary": exe, "error": "Codex CLI inspection failed or timed out",
+                "hint": "Check executable permissions and run codex --version; no model request was made."}
     missing = [f for f in REQUIRED_FLAGS if f not in help_result.stdout]
     return {"available": version.returncode == 0 and help_result.returncode == 0 and not missing,
-            "binary": exe, "version": version.stdout.strip(), "missing_flags": missing}
+            "binary": exe, "version": version.stdout.strip(), "missing_flags": missing,
+            "authentication_checked": False, "model_connection_checked": False}
 
 
 def minimized_input(report):

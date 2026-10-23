@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Persist initialization-thread exclusion; validate date/timeout before collection and support configuration arguments on either side of a command.
+- Resolve configured CLI paths relative to config, add model-specific diagnostics and handle interface timeouts.
+- Add metadata-only daily progress, read-only expected-day status and interruption detection; keep failure warnings visible in single-date Markdown.
+- Protect newer SQLite schemas and report damaged state without resetting private data.
+- Expand installed-wheel acceptance with an offline model simulator; add user-journey regression tests, troubleshooting and Beta readiness boundaries.
+- Use current SPDX packaging metadata and add macOS to CI.
+
 ## 0.6.0
 
 - Add explicit `daily --backend codex` for scheduled model-authored work journals and review notes; rules remain the default.

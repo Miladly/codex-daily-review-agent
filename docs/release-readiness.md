@@ -2,7 +2,7 @@
 
 ## Scope
 
-This is a shareable local MVP for macOS/Linux and Python 3.10+, with configuration, tests, MIT licensing, privacy documentation, contribution guidance and CI. It is not a guaranteed unattended scheduler, a stable Codex log-format standard, a native Windows application, or an automatic scientific-validity checker.
+This is a shareable local CLI Beta for macOS/Linux and Python 3.10+, with configuration, tests, MIT licensing, privacy documentation, contribution guidance and CI. It is not a guaranteed unattended scheduler, a stable Codex log-format standard, a native Windows application, or an automatic scientific-validity checker.
 
 Core drafts require only Python and existing Codex session logs. SSH, Git worktree matching, model summarization and Notion are optional capabilities with explicit prerequisites. The repository supplies neither service credentials nor a preconfigured personal workspace.
 
@@ -30,3 +30,6 @@ The publishable history contains only generic code, documentation and synthetic 
 ## Limits
 
 Known-format redaction is best effort. Evidence excerpts can still contain project names or proprietary prose. Keep local state and every real report private. The scheduled runner's environment, wake state, authentication and network affect execution. Confirm optional integrations against your own account; the automated suite uses mocks and synthetic data, not live credentials.
+
+
+The first-install audit and remaining boundaries are recorded in [open-source readiness](open-source-audit.md). Installed-wheel tests exercise both default rules and an offline model executable simulator, including failure/recovery and missed-run checks; the simulator is not a live model integration test.

@@ -59,3 +59,14 @@ python -m daily_review daily --through today --days 3 --backend codex --model-ti
 `last-run.json` 提供每日期 `backend`、`model_status`（generated/cached/fallback/disabled）、模型工作记录数，以及总 `model_calls`（适配器调用尝试数）与 `model_errors`。失败时先保存规则工作记录，返回退出码2和attention，并在正文标注模型提炼未完成；其他日期仍继续。私有错误诊断保存在 `model-failures/`，命令输出不返回摘录和错误正文。后续重跑会重试失败的日期，成功且未变化的日期不会重复调用。
 
 不带 `--backend codex` 仍明确使用规则模式，会把所选日期渲染为规则草稿。若已启用每日模型提炼，手动补跑也应沿用完整命令，避免误将模型草稿切回规则版本。模型提炼权限不包含 Notion 发布或上传真实日报到 GitHub。
+
+
+## 检查漏跑与中断
+
+```sh
+python -m daily_review status --through yesterday --backend codex
+```
+
+规则模式请省略后端参数。这个只读检查以配置时区计算昨天，核对最近完成的一轮是否覆盖该日期、是否完成要求的模型模式、笔记是否存在，以及有无尚未完成的运行。它不会读取日志或笔记正文、重跑模型、安装额外调度任务，也不能主动保证准点唤醒。需要提醒时，由你自己的调度器调用此检查并根据退出码处理。
+
+先按[排错表](troubleshooting.md)处理错误，再用与原任务相同的完整命令补跑。不要因为看到了旧笔记就认定昨晚已成功。daily 的 stderr 提供阶段进度，stdout 保留最终 JSON；调度器可以分别保存，两个输出仍属于私人诊断材料。

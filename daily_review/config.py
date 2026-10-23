@@ -66,6 +66,14 @@ def load(path=None):
         return str((target if target.is_absolute() else base/target).resolve())
     for key in ('codex_home', 'state_dir'):
         cfg[key] = absolute(cfg[key])
+    if 'codex_binary' in cfg:
+        binary = cfg['codex_binary']
+        if not isinstance(binary, str) or not binary.strip():
+            raise ValueError('codex_binary must be an executable name or path')
+        if '/' in binary:
+            cfg['codex_binary'] = absolute(binary)
+    if 'model' in cfg and (not isinstance(cfg['model'], str) or not cfg['model'].strip()):
+        raise ValueError('model must be a nonempty model name')
     if under(cfg['state_dir'], cfg['codex_home']):
         raise ValueError('state_dir must be outside CODEX_HOME, before creating any local state')
     cfg['reports_dir'] = resolve_reports_dir(cfg.get('reports_dir', str(Path(cfg['state_dir'])/'reports')), cfg, base, path)
@@ -129,6 +137,9 @@ def initialize(path, codex_home=None, timezone='Asia/Shanghai', reports_dir=None
             'exclude_cwds': [str(ROOT)], 'project_overrides': [], 'remote_sources': [],
             'notion': {'records_data_source': '', 'projects_data_source': '',
                        'project_aliases': {}, 'create_missing_projects': False}}
+    current = os.environ.get('CODEX_THREAD_ID')
+    if current:
+        data['exclude_session_ids'].append(current)
     # Validate before writing. No source data or credentials are read.
     if not isinstance(timezone, str):
         raise ValueError('invalid timezone')

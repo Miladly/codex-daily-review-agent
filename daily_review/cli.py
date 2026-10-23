@@ -3,6 +3,8 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import sqlite3
+import subprocess
 import sys
 from zoneinfo import ZoneInfo
 from . import __version__
@@ -13,7 +15,7 @@ from .notion import Client, apply_plan, make_plan, remote_snapshot
 from .review import build_report, save_report
 from .store import connect
 from .util import lock, redact, write_json
-from .daily import run_daily
+from .daily import dates_for, run_daily
 from .remote import collect_all
 
 
@@ -26,7 +28,11 @@ def parser():
     p.add_argument("--config", help="optional local JSON config")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="command", required=True)
-    sub.add_parser("doctor", help="inspect local paths and CLI capability without a model call")
+    q = sub.add_parser("doctor", help="inspect local paths and CLI capability without a model call")
+    q.add_argument("--backend", choices=["rules", "codex"], default="rules")
+    q = sub.add_parser("status", help="check whether the expected day's run completed; read-only, no model call")
+    q.add_argument("--through", default="yesterday", help="expected date: today, yesterday or YYYY-MM-DD")
+    q.add_argument("--backend", choices=["rules", "codex"], default="rules")
     q = sub.add_parser("init", help="create private local configuration; never overwrite or contact external services")
     q.add_argument("--codex-home", help="source Codex directory, defaults to CODEX_HOME or ~/.codex")
     q.add_argument("--timezone", default="Asia/Shanghai")
@@ -41,6 +47,7 @@ def parser():
     q.add_argument("--days", type=int, default=3, help="refresh this many days, default 3; no-event new days are skipped")
     q.add_argument("--backend", choices=["rules", "codex"], default="rules", help="explicit opt-in sends bounded redacted excerpts to the model")
     q.add_argument("--model-timeout", type=int, default=240)
+    q.add_argument("--quiet", action="store_true", help="suppress metadata-only progress on stderr")
     q = sub.add_parser("export-events", help="write versioned local interchange; private data, never upload with source")
     q.add_argument("--date", required=True)
     for cmd in ("review", "run"):
@@ -56,6 +63,8 @@ def parser():
     q = sub.add_parser("notion-sync", help="write only an explicitly approved online plan")
     q.add_argument("--plan", required=True)
     q.add_argument("--approve", required=True, help="approval_hash from the reviewed online plan")
+    for command in sub.choices.values():
+        command.add_argument("--config", default=argparse.SUPPRESS, help="optional local JSON config")
     return p
 
 
@@ -78,6 +87,20 @@ def main(argv=None):
             return 0
         cfg = load(args.config)
         state = Path(cfg["state_dir"])
+        # Reject mistakes before locking, creating SQLite, collection or network.
+        if args.command in ("daily", "status"):
+            dates_for(args.through, getattr(args, "days", 1), cfg["timezone"])
+        if getattr(args, "date", None):
+            parsed = datetime.strptime(args.date, "%Y-%m-%d").date().isoformat()
+            if parsed != args.date:
+                raise ValueError("date must be YYYY-MM-DD")
+        if getattr(args, "model_timeout", 1) <= 0:
+            raise ValueError("model-timeout must be positive")
+        if args.command == "status":
+            from .health import run_status
+            result = run_status(cfg, args.through, args.backend)
+            emit(result)
+            return 0 if result["status"] == "ok" else 2
         if args.command == "migrate-reports":
             from .migration import migrate_reports
             emit(migrate_reports(config_path(args.config), args.to, apply=args.apply))
@@ -85,7 +108,10 @@ def main(argv=None):
         if args.command == "doctor":
             home = Path(cfg["codex_home"])
             available = home.is_dir() and any((home / name).is_dir() for name in ("sessions", "archived_sessions"))
-            emit({"status": "ok" if available else "attention", "source_available": available,
+            cli = doctor(cfg.get("codex_binary", "codex"))
+            ready = available and (args.backend == "rules" or cli["available"])
+            emit({"status": "ok" if ready else "attention", "source_available": available,
+                  "requested_backend": args.backend,
                   "source_hint": "" if available else "No Codex sessions directory found; set codex_home or create a Codex session first.",
                   "version": __version__, "codex_home_env": os.environ.get("CODEX_HOME"),
                   "resolved_codex_home": str(home), "state_dir": str(state), "reports_dir": cfg["reports_dir"], "timezone": cfg["timezone"],
@@ -93,13 +119,16 @@ def main(argv=None):
                   "archived_sessions": len(list((home / "archived_sessions").rglob("*.jsonl"))),
                   "excluded_session_ids": cfg["exclude_session_ids"], "excluded_cwds": cfg["exclude_cwds"],
                   "remote_sources": [{"id": s["id"], "host": s["host"], "enabled": s.get("enabled", True)} for s in cfg["remote_sources"]],
-                  "codex_cli": doctor(cfg.get("codex_binary", "codex")), "network_calls": 0})
-            return 0 if available else 2
+                  "codex_cli": cli, "network_calls": 0})
+            return 0 if ready else 2
         with lock(state / ".agent.lock"):
             db = connect(state)
             try:
                 if args.command == "daily":
-                    result = run_daily(db, cfg, args.through, args.days, args.backend, args.model_timeout)
+                    def progress(event):
+                        if not args.quiet:
+                            print(json.dumps(event, ensure_ascii=False), file=sys.stderr, flush=True)
+                    result = run_daily(db, cfg, args.through, args.days, args.backend, args.model_timeout, progress)
                     emit(result)
                     return 2 if result["status"] == "attention" else 0
                 if args.command == "export-events":
@@ -129,9 +158,11 @@ def main(argv=None):
                         try:
                             report = summarize(report, cfg, args.model_timeout)
                             path = save_report(db, cfg, report)
-                        except (RuntimeError, ValueError, KeyError, TypeError, OSError) as e:
+                        except (RuntimeError, ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as e:
                             error = redact(str(e), 500, True)
                             report["model_error"] = error
+                            report["model_status"] = "fallback"
+                            report["limitations"].append("模型提炼未完成；当前保留本地规则工作记录，请稍后重试。")
                             path = save_report(db, cfg, report)
                     emit({"markdown": str(path), "json": str(state / "reports" / (date + ".json")),
                           "sqlite": str(state / "review.sqlite3"), "coverage": report["coverage"],
@@ -161,7 +192,10 @@ def main(argv=None):
                     return 0
             finally:
                 db.close()
-    except (OSError, RuntimeError, ValueError, KeyError, TypeError) as e:
+    except sqlite3.Error:
+        print("daily-review: local SQLite state could not be opened or read; preserve the state directory and private backups before repair.", file=sys.stderr)
+        return 1
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as e:
         print("daily-review: " + redact(str(e), 600, True), file=sys.stderr)
         return 1
 

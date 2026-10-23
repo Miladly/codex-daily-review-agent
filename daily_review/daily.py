@@ -28,18 +28,28 @@ def material_fingerprint(report):
     return digest(data)
 
 
-def run_daily(db, cfg, through="today", days=3, backend="rules", model_timeout=240):
+def run_daily(db, cfg, through="today", days=3, backend="rules", model_timeout=240, progress=None):
     if backend not in ("rules", "codex") or model_timeout <= 0:
         raise ValueError("invalid model backend or timeout")
     dates = dates_for(through, days, cfg["timezone"])
+    root = Path(cfg["state_dir"]) / "runs"
+    pending = root / "in-progress.json"
+    write_json(pending, {"started_at": now(), "dates": dates, "backend": backend})
+    def emit(stage, **metadata):
+        if progress:
+            progress({"stage": stage, **metadata})
+    emit("collection_started", days=len(dates))
     stats = collect_all(db, cfg)
+    emit("collection_finished", inserted=stats.get("inserted", 0), source_errors=stats.get("source_errors", 0))
     results, model_calls, model_errors = [], 0, 0
     for date in dates:
+        emit("day_started", date=date)
         report = build_report(db, date, cfg["timezone"])
         previous = db.execute("SELECT payload FROM reports WHERE date=? AND timezone=?", (date, cfg["timezone"])).fetchone()
         old = json.loads(previous[0]) if previous else None
         if not report["coverage"]["events"] and old is None:
             results.append({"date": date, "status": "no_events", "changed": False})
+            emit("day_finished", date=date, status="no_events")
             continue
         model_status = "disabled"
         if backend == "codex" and report["coverage"]["events"]:
@@ -63,17 +73,23 @@ def run_daily(db, cfg, through="today", days=3, backend="rules", model_timeout=2
             if cached:
                 report = apply_summary(report, cached["summary"], cached["metadata"])
                 model_status = "cached"
+                emit("model_cached", date=date)
             else:
                 # Save facts before any network operation. A killed/timed-out
                 # process cannot leave a changed day without a readable draft.
+                report["model_status"] = "pending"
+                report["limitations"].append("模型提炼进行中；当前暂存本地规则工作记录。")
                 save_report(db, cfg, report)
+                report = build_report(db, date, cfg["timezone"])
                 model_calls += 1
+                emit("model_started", date=date, timeout_seconds=model_timeout)
                 try:
                     report = summarize(report, cfg, model_timeout)
                     validate_output(report["model_summary"], data)
                     write_json(cache_path, {"input_hash": key, "summary": report["model_summary"],
                                             "metadata": report["model_input"]})
                     model_status = "generated"
+                    emit("model_finished", date=date)
                 except (OSError, RuntimeError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
                     # A mismatched older answer must never describe new evidence.
                     report = build_report(db, date, cfg["timezone"])
@@ -83,6 +99,7 @@ def run_daily(db, cfg, through="today", days=3, backend="rules", model_timeout=2
                     report["limitations"].append(report["model_error"])
                     write_json(Path(cfg["state_dir"]) / "model-failures" / (date + ".json"),
                                {"at": now(), "input_hash": key, "error": redact(str(error), 500, True)})
+                    emit("model_failed", date=date)
         report["model_status"] = "ready" if model_status in ("cached", "generated") else model_status
         changed = old is None or material_fingerprint(old) != material_fingerprint(report)
         if not changed:
@@ -98,10 +115,12 @@ def run_daily(db, cfg, through="today", days=3, backend="rules", model_timeout=2
                         "notion_plan": str(plan_path),
                         "projects_to_create": len(plan.get("create_projects", [])),
                         "unmatched_projects": len(plan["unmatched_projects"])})
+        emit("day_finished", date=date, backend=report["backend"], model_status=model_status, changed=changed,
+             markdown=str(path))
     result = {"status": "attention" if stats["issues"] or stats["source_errors"] or model_errors else "ok", "ran_at": now(),
               "timezone": cfg["timezone"], "format": FORMAT_VERSION, "collection": stats, "days": results,
               "changed_days": sum(r["changed"] for r in results), "remote_writes": 0,
               "model_calls": model_calls, "model_errors": model_errors}
-    root = Path(cfg["state_dir"]) / "runs"
     write_json(root / "last-run.json", result)
+    pending.unlink()
     return result

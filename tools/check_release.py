@@ -8,15 +8,15 @@ import re
 import subprocess
 import sys
 
-MODULES = {'__init__', '__main__', 'cli', 'collector', 'config', 'daily', 'exchange', 'model',
+MODULES = {'__init__', '__main__', 'cli', 'collector', 'config', 'daily', 'health', 'exchange', 'model',
            'notion', 'projects', 'remote', 'remote_worker', 'review', 'store', 'util', 'migration', 'method', 'journal'}
 ROOT_FILES = {'.gitignore', 'README.md', 'PRIVACY.md', 'LICENSE', 'pyproject.toml', 'config.example.json', 'MANIFEST.in', 'CONTRIBUTING.md', 'SECURITY.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md'}
 DOCS = {'docs/architecture.md', 'docs/configuration.md', 'examples/sample-review.md', 'docs/release-readiness.md',
-        'docs/obsidian.md', 'docs/usage.md', 'docs/scheduling.md', 'docs/notes-design.md', 'docs/review-method-sources.md', 'docs/journal-format.md',
+        'docs/obsidian.md', 'docs/usage.md', 'docs/scheduling.md', 'docs/troubleshooting.md', 'docs/open-source-audit.md', 'docs/notes-design.md', 'docs/review-method-sources.md', 'docs/journal-format.md',
         'daily_review/skills/evidence-daily-review/SKILL.md',
         'daily_review/skills/evidence-daily-review/references/quality.md',
         '.agents/skills/evidence-daily-review/SKILL.md'}
-TESTS = {'tests/test_agent.py', 'tests/test_daily_and_projects.py', 'tests/test_remote.py', 'tests/test_release.py', 'tests/test_onboarding.py', 'tests/test_notes.py', 'tests/test_review_quality.py', 'tests/test_journal.py'}
+TESTS = {'tests/test_agent.py', 'tests/test_daily_and_projects.py', 'tests/test_remote.py', 'tests/test_release.py', 'tests/test_onboarding.py', 'tests/test_notes.py', 'tests/test_review_quality.py', 'tests/test_journal.py', 'tests/test_user_journey.py'}
 
 
 def allowed(path):

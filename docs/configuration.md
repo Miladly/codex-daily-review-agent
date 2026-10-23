@@ -6,7 +6,7 @@ The default Codex source is `CODEX_HOME`, falling back to `~/.codex`. Paths in c
 
 Supported platforms are macOS and Linux, Python 3.10+ with IANA timezone data. Native Windows is unsupported; use WSL2. Git and SSH are optional until their features are configured. The Codex CLI is optional until model summarization is explicitly requested.
 
-The default timezone is `Asia/Shanghai`; set your own IANA timezone if desired. Exclude all directories and session IDs used by the reviewing agent. `CODEX_THREAD_ID`, when present, is excluded automatically. Keep exclusions in private configuration, not public examples.
+The default timezone is `Asia/Shanghai`; set your own IANA timezone if desired. Exclude all directories and session IDs used by the reviewing agent. `CODEX_THREAD_ID`, when present, is excluded automatically; init also persists it for later runs. Keep exclusions in private configuration, not public examples.
 
 Optional `reports_dir` controls Markdown and its `manual/` reflection folder only. It defaults to `state_dir/reports`, preserving existing installations. `init --reports-dir PATH` configures it for a new installation; use `migrate-reports --to PATH` then `--apply` for existing notes. Relative paths resolve from the configuration directory. JSON, SQLite, cursors and plans stay under `state_dir`. A notes folder cannot overlap `CODEX_HOME` or contain private state. The notes directory is an additive self-exclusion. See [Obsidian and migration](obsidian.md).
 
@@ -58,3 +58,6 @@ The approval hash detects content changes; it is not a substitute for human revi
 - Existing date note refused: keep your personal note and choose a dedicated output folder or rename it after backing up. Agent markers and the manual reflection heading must remain intact. Do not use force-overwrite workarounds.
 - Migration interrupted: original notes and the old configuration remain active until a verified switch. Identical copies can be reused by retrying; conflicting copies require human review. File systems that do not support the no-overwrite hard-link installation fail without a configuration switch.
 - Notion: default offline plans need no credential. Online access requires your own schema and IDs; see the preflight error before changing anything. Do not paste tokens or full diagnostic output into an issue.
+
+
+Optional `codex_binary` is either an executable name on PATH or a path relative to the configuration directory (with tilde expansion); use an absolute path for a scheduler. `model`, when set, must be a nonempty string. `doctor --backend codex` checks the executable/interface without calling a model or verifying authentication. See [first-use troubleshooting](troubleshooting.md).
