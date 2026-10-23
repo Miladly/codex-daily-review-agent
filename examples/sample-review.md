@@ -26,7 +26,7 @@
 
 **相关产物（按记录定位，未重新检查文件）**
 
-- [示例说明](<docs/synthetic-guide.md>)
+- 示例说明：`docs/synthetic-guide.md`（虚构产物路径，仅用于演示，未附带文件）
 
 ## 复盘思考
 
