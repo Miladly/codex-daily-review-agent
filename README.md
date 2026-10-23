@@ -6,7 +6,7 @@
 
 > This repository contains the Codex-only edition: a local-first, read-only session collector with evidence-linked daily drafts, optional SSH sources, and approval-gated Notion synchronization.
 
-**当前定位：v0.7.0 Beta。** 适合能够配置 Python 的 macOS/Linux 用户试用；安装项目不会自动配置定时任务。已补齐首次安装诊断、运行进度、漏跑检查和失败恢复，仍需用户维护运行环境。见[开源成熟度审计](docs/open-source-audit.md)。
+**当前定位：v0.7.1 Beta。** 适合能够配置 Python 的 macOS/Linux 用户试用；安装项目不会自动配置定时任务。已补齐首次安装诊断、运行进度、漏跑检查和失败恢复，仍需用户维护运行环境。见[开源成熟度审计](docs/open-source-audit.md)。
 
 ## 能做什么
 

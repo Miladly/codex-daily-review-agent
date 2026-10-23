@@ -24,4 +24,4 @@ jobs:
       - run: python tools/check_release.py --history
       - run: python -m pip install build
       - run: python -m build
-      - run: python tools/smoke_install.py --wheel dist/local_daily_review_agent-0.7.0-py3-none-any.whl --sdist dist/local_daily_review_agent-0.7.0.tar.gz
+      - run: python tools/smoke_install.py --wheel dist/local_daily_review_agent-0.7.1-py3-none-any.whl --sdist dist/local_daily_review_agent-0.7.1.tar.gz

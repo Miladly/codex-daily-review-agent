@@ -33,3 +33,8 @@ Migration previews are read-only. Explicit application copies only date Markdown
 ## Reporting an issue
 
 For a suspected credential exposure, revoke the credential first. Share only a redacted reproduction and synthetic fixtures. Never attach real logs or the SQLite database to a public issue.
+
+
+## Markdown display boundary
+
+Agent-managed Markdown renders evidence/model prose as escaped text rather than active HTML, images or note embeds. Recorded artifact navigation is separate: only permitted local/file paths are retained, protocols are checked after decoding, control characters are rejected, and persisted targets are revalidated before rendering. Targets are encoded for Markdown. This does not open or verify the files. Human reflection is user-owned and is appended unchanged; any embeds added there are under the user’s control.

@@ -112,3 +112,61 @@ class JournalCase(AgentFixture):
         from pathlib import Path
         data=json.loads((Path(self.cfg['state_dir'])/'model-input/2026-10-20.json').read_text())
         self.assertTrue(any(c['section_hint']=='work_records' for s in data['sessions'] for c in s['claims']))
+
+
+    def test_auto_records_escape_html_images_and_note_embeds(self):
+        attack = '<img src="https://example.com/synthetic-pixel"> ![](https://example.com/pixel) ![[embed]]'
+        self.write([meta(self.cwd), message('已完成合成工作。'+attack)]); self.scan()
+        report = self.report()
+        report['projects'][0]['name'] = attack
+        body = render(report)
+        self.assertNotIn('<img', body)
+        self.assertNotIn('![](', body)
+        self.assertNotIn('![[embed]]', body)
+        self.assertIn('&lt;img', body)
+        self.assertIn('已完成合成工作', body)
+        self.assertIn('<!-- DAILY_REVIEW_AGENT_BEGIN -->', body)
+        self.assertIn('<!-- DAILY_REVIEW_AGENT_END -->', body)
+
+    def test_model_text_and_acceptance_cannot_activate_html_or_images(self):
+        self.seed(); report=self.report(); data=minimized_input(report)
+        source=next(c for c in data['sessions'][0]['claims'] if c['section_hint']=='work_records')
+        attack='<iframe src="https://example.com/synthetic"></iframe> ![](https://example.com/pixel)'
+        answer=empty_answer(data)
+        answer['projects'][0]['claims']=[dict(output_claim(source,'work_records'),text=attack)]
+        answer['daily']['claims']=[dict(output_claim(source,'next_steps',evidence='C',acceptance=attack),text='合成后续建议')]
+        report['model_summary']=validate_output(answer,data)
+        body=render(report)
+        self.assertNotIn('<iframe',body)
+        self.assertNotIn('![](',body)
+        self.assertIn('&lt;iframe',body)
+        self.assertIn('完成标准',body)
+
+    def test_decoded_artifact_schemes_and_controls_are_rejected(self):
+        for target in ('javascript%3Arun.pdf','https%3A//example.com/file.md',
+                       'docs/file%3Ftoken%3Dsynthetic.md','docs/line%0Abreak.md',
+                       'docs/line%0Dbreak.md','%2F%2Fexample.com/file.md'):
+            self.assertEqual(artifact_links('[合成产物]('+target+')'),[],target)
+        self.assertEqual(artifact_links('[合成产物](docs/example%20draft.md)')[0]['target'],'docs/example draft.md')
+
+    def test_persisted_artifacts_are_revalidated_and_safe_paths_are_encoded(self):
+        self.seed(); report=self.report()
+        record=report['projects'][0]['work_records'][0]
+        record['artifacts']=[{'label':'unsafe','target':'javascript:run.md','origin':'local'},
+                             {'label':'safe','target':'docs/example draft(1).md','origin':'local'}]
+        body=render(report)
+        self.assertNotIn('javascript:',body)
+        self.assertIn('docs/example%20draft%281%29.md',body)
+
+    def test_security_escaping_does_not_rewrite_human_reflection(self):
+        from pathlib import Path
+        self.seed(); report=self.report()
+        manual=Path(self.cfg['state_dir'])/'reports/manual/2026-10-20.md'
+        manual.parent.mkdir(parents=True,exist_ok=True)
+        human='人工自选格式：<span>保留原文</span> ![[my-note]]'
+        manual.write_text(human)
+        path=save_report(self.db,self.cfg,report)
+        self.assertTrue(path.read_text().endswith(human))
+        self.assertEqual(manual.read_text(),human)
+        save_report(self.db,self.cfg,report)
+        self.assertEqual(manual.read_text(),human)

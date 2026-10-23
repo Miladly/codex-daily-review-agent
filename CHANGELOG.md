@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+- Escape untrusted journal/model text in managed Markdown so HTML, images and embedded content remain text. Human reflection remains unchanged.
+- Validate artifact schemes after percent decoding, reject control characters, and revalidate persisted links at render time. Encode safe navigation targets.
+- Mark the fictional example artifact as non-clickable demonstration text.
+
 ## 0.7.0
 
 - Persist initialization-thread exclusion; validate date/timeout before collection and support configuration arguments on either side of a command.

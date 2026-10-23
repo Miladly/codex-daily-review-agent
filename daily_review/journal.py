@@ -4,9 +4,10 @@ No source commands, artifact files or remote destinations are opened here.
 Structured records remain private and can be grouped by date/project later.
 """
 from datetime import datetime
+import html
 import json
 import re
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 from zoneinfo import ZoneInfo
 
 from .method import choose, is_plan
@@ -26,27 +27,38 @@ def excerpt(text, limit=300):
     return redact(text, limit)
 
 
+def inline_text(text, limit=1000):
+    """Render untrusted evidence as text, never HTML, images or embeds."""
+    value = html.escape(excerpt(str(text), limit), quote=False)
+    return re.sub(r"([\\`*_{}\[\]()#!|])", r"\\\1", value)
+
+
+def artifact_target(raw, decode=True):
+    if not isinstance(raw, str):
+        return None
+    target = unquote(raw.strip("<>")) if decode else raw
+    if any(ord(c) < 32 or ord(c) == 127 for c in target):
+        return None
+    parsed = urlparse(target)
+    if parsed.scheme not in ("", "file") or parsed.netloc or parsed.query or parsed.fragment:
+        return None
+    if not re.search(r"\.(?:md|docx|pdf|png|svg|pptx|xlsx)$", target, re.I):
+        return None
+    target = parsed.path if parsed.scheme == "file" else target
+    return target if len(target) <= 500 else None
+
+
 def artifact_links(text, origin="local"):
-    """Only reuse recorded links; reject executable/credential-bearing URLs."""
+    """Validate after decoding; reuse local recorded links without opening them."""
     result, seen = [], set()
     candidates = re.findall(r"\[([^\]\n]+)\]\(<?([^\n>]+?)>?\)(?=\s|$|[，。；·])", text)
     candidates += [("文件产物", raw) for raw in re.findall(r"(?<![:/\w])(?:/|~/)[^,\n<>]*?\.(?:md|docx|pdf|png|svg|pptx|xlsx)(?=[\s,;>)]|$)", text, re.I)]
     for label, raw in candidates:
-        target = raw.strip("<>")
-        parsed = urlparse(target)
-        if parsed.scheme not in ("", "file") or parsed.netloc or parsed.query or parsed.fragment:
-            continue
-        if not re.search(r"\.(?:md|docx|pdf|png|svg|pptx|xlsx)$", target, re.I):
-            continue
-        target = unquote(target)
-        if parsed.scheme == "file":
-            target = unquote(parsed.path)
-        if len(target)>500:
+        target = artifact_target(raw)
+        if target is None or target in seen:
             continue
         if label == "文件产物":
-            label = target.rsplit("/",1)[-1]
-        if target in seen:
-            continue
+            label = target.rsplit("/", 1)[-1]
         seen.add(target)
         result.append({"label": excerpt(label, 100), "target": redact(target, 500),
                        "origin": origin, "availability": "not_checked"})
@@ -136,7 +148,7 @@ def render_hybrid(report):
             used.add(ref)
         return " （证据："+", ".join(ref[:12] for ref in rows)+"）"
     def claim_line(c):
-        return "- ["+c["evidence"]+"] "+excerpt(c["text"], 700)+refs(c["refs"])
+        return "- ["+c["evidence"]+"] "+inline_text(c["text"], 700)+refs(c["refs"])
     out = [f'# {report["date"]}｜每日工作记录与复盘（AI草稿）', "",
            f'时区：{report["timezone"]}；生成：{report["generated_at"]}；后端：{report["backend"]}', "",
            "<!-- DAILY_REVIEW_AGENT_BEGIN -->", "## 今日工作概览", "",
@@ -144,12 +156,12 @@ def render_hybrid(report):
            "| 项目 | 本日工作记录概览 |", "|---|---|"]
     for p in report["projects"]:
         rows = model_records(report, by_project.get(p["project_id"], {})) or project_records(p)
-        overview = "；".join(excerpt(r["work"], 90) for r in ([rows[0], rows[-1]] if len(rows)>1 else rows))
-        out += ["| "+p["name"].replace("|", "／")+" | "+(overview or "仅有意图或证据不足，未列为已完成工作").replace("|", "／")+" |"]
+        overview = "；".join(inline_text(r["work"], 90) for r in ([rows[0], rows[-1]] if len(rows)>1 else rows))
+        out += ["| "+inline_text(p["name"], 200)+" | "+(overview or "仅有意图或证据不足，未列为已完成工作")+" |"]
     out += ["", "## 分项目工作记录", "",
             "记录优先保留做过的事项、处理结果和产物。A=工具记录；B=会话陈述；C=意图／建议；均不自动代表科研有效或最终验收。", ""]
     for p in report["projects"]:
-        out += ["### "+p["name"], ""]
+        out += ["### "+inline_text(p["name"], 200), ""]
         rows = model_records(report, by_project.get(p["project_id"], {})) or project_records(p)
         if not rows:
             out += ["本日只有工作意图或计划，暂无足够结果记录；请人工补充实际工作。", ""]
@@ -157,23 +169,24 @@ def render_hybrid(report):
         visible = rows if len(rows)<=8 else rows[:3]+rows[-5:]
         for row in visible:
             stamp = (row.get("local_time", "")+" ") if row.get("local_time") else ""
-            out += ["- "+stamp+"["+row["evidence"]+"] "+row.get("description", row["work"])+refs(row["refs"])]
+            out += ["- "+stamp+"["+row["evidence"]+"] "+inline_text(row.get("description", row["work"]))+refs(row["refs"])]
         if len(visible)<len(rows):
             out += [f'另有 {len(rows)-len(visible)} 条已选工作事项保存在私有JSON；中段记录未全部展示。']
         links, seen = [], set()
         for row in rows:
             for artifact in row["artifacts"]:
-                if artifact["target"] not in seen:
-                    links.append(artifact); seen.add(artifact["target"])
+                target = artifact_target(artifact.get("target"), decode=False)
+                if target is not None and target not in seen:
+                    links.append(dict(artifact, target=target)); seen.add(target)
         if links:
             out += ["", "**相关产物（按记录定位，未重新检查文件）**", ""]
             for a in links[:8]:
                 target = a["target"]
                 if a["origin"] != "local":
-                    out += ["- 远程记录：`"+a["label"]+"`"]
+                    out += ["- 远程记录："+inline_text(a["label"], 100)]
                 else:
                     # Leave file paths quoted; never turn source text into code.
-                    out += ["- ["+a["label"].replace("]", "")+"](<"+target.replace(">", "%3E")+">)"]
+                    out += ["- ["+inline_text(a["label"], 100)+"](<"+quote(target, safe="/~:._-")+">)"]
         out += [""]
     out += ["## 复盘思考", ""]
     daily = model.get("daily", {}).get("claims", [])
@@ -189,7 +202,7 @@ def render_hybrid(report):
     actions = [c for c in daily if c["section"] == "next_steps"]
     if actions:
         for c in actions[:3]:
-            out += [claim_line(c), "  完成标准："+c["acceptance"]]
+            out += [claim_line(c), "  完成标准："+inline_text(c["acceptance"], 500)]
     else:
         out += ["以下为日志中记录的后续建议，尚未自动核对是否已在后续处理；请先检查工作记录，避免重复待办。", ""]
         out += [claim_line(c) for c in report.get("daily", {}).get("next_steps", [])[:3]] or ["暂无明确后续建议。"]
@@ -197,22 +210,22 @@ def render_hybrid(report):
     if history:
         out += ["", "### 跨天延续", "", "历史线索不计入今日成果；没有当日对应证据时不自动认定关闭。", ""]
         for e in history[:3]:
-            out += ["- "+e["date"]+" "+excerpt(e["claim"]["text"], 200)+refs(e["claim"]["refs"])]
+            out += ["- "+e["date"]+" "+inline_text(e["claim"]["text"], 200)+refs(e["claim"]["refs"])]
     out += ["", "## 来源与留存", "",
             "工作记录按日期及原项目标识保存在私有JSON的work_records中，复盘判断与建议分开；供后续周报、月报按项目归并。同一产物或实验的多次进度不能重复累计为独立成果。", ""]
     for field, label in (("events_by_tool", "工具事件"), ("events_by_origin", "来源事件")):
-        if cov.get(field): out += [label+"："+"；".join(k+"="+str(v) for k,v in sorted(cov[field].items()))+"。"]
+        if cov.get(field): out += [label+"："+"；".join(inline_text(k, 100)+"="+str(v) for k,v in sorted(cov[field].items()))+"。"]
     for field, label in (("local_sources", "本地采集"), ("remote_sources", "远程采集")):
-        if cov.get(field): out += [label+"："+"；".join(r["source_id"]+"="+r["status"] for r in cov[field])+"。"]
+        if cov.get(field): out += [label+"："+"；".join(inline_text(r["source_id"], 100)+"="+inline_text(r["status"], 100) for r in cov[field])+"。"]
     if report.get("review_method"):
         out += ["复盘方法："+report["review_method"]["name"]+" v"+report["review_method"]["version"]+"。"]
-    out += [""]+["- "+s for s in report["limitations"]]
+    out += [""]+["- "+inline_text(s) for s in report["limitations"]]
     out += ["", "### 证据索引", "", "完整事件及会话层结构保留在本地SQLite与同日JSON；此处只列正文引用。", ""]
     for ref in sorted(used):
         e = report["evidence_index"][ref]
         src = e.get("sources", [])
         location = (src[0]["path"]+":"+str(src[0]["line"])) if src else "无来源位置"
-        out += ["- `"+ref[:12]+"`｜"+e["timestamp"]+"｜"+location]
+        out += ["- `"+ref[:12]+"`｜"+e["timestamp"]+"｜"+inline_text(location, 1200)]
     out += ["", "<!-- DAILY_REVIEW_AGENT_END -->", "", "## 人工补充与最终反思", "",
             "请在同目录 manual/日期.md 填写；重跑会保留该文件并带入此处。", ""]
     return "\n".join(out)

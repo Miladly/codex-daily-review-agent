@@ -2,7 +2,7 @@
 
 ## Release position
 
-Version 0.7.0 is a local CLI **Beta**, suitable for users who can configure Python and review private local output. It is not a 1.0 consumer application or an always-on scheduling service. Opening the source is separate from publishing personal journals or changing repository visibility.
+Version 0.7.1 is a local CLI **Beta**, suitable for users who can configure Python and review private local output. It is not a 1.0 consumer application or an always-on scheduling service. Opening the source is separate from publishing personal journals or changing repository visibility.
 
 ## User journey findings and fixes
 
@@ -31,3 +31,6 @@ Tests use synthetic logs in temporary directories. Installed-wheel acceptance al
 - Before public visibility: rerun full source/history/package privacy checks, review exact tracked files and metadata, verify CI, and keep runtime directories/configuration separate. Never expose personal verification artifacts.
 
 See [first-use troubleshooting](troubleshooting.md), [scheduling](scheduling.md), [release checks](release-readiness.md) and [privacy](../PRIVACY.md).
+
+
+Final review additionally verified the managed Markdown display boundary: log/model text is escaped, and percent-encoded or persisted artifact targets cannot bypass protocol/control-character validation. Human reflection remains untouched.
